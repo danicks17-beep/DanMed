@@ -1,0 +1,275 @@
+/* Custom Header and Column Cell Styling */
+.modmed-custom-th {
+  background-color: #f1f5f9 !important;
+  color: #334155;
+  font-weight: bold;
+  padding: 8px 10px;
+  border-bottom: 2px solid #cbd5e1;
+  text-align: left;
+}
+
+.modmed-custom-cell {
+  padding: 8px 10px;
+  vertical-align: middle;
+}
+
+.modmed-right-col-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+/* Injected Wrapper for Snooze Button */
+.modmed-snooze-wrapper-original {
+  margin-top: 4px;
+  display: inline-block;
+}
+
+/* Original ModMed-styled Snooze Button */
+.modmed-snooze-btn {
+  background-color: #f8f9fa;
+  border: 1px solid #007bff;
+  color: #007bff;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.modmed-snooze-btn:hover {
+  background-color: #e2e8f0;
+  border-color: #007bff;
+}
+
+/* Snoozed Badge */
+.modmed-snoozed-badge {
+  background-color: #e2e8f0;
+  color: #2d3748;
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+/* Task Label Tag */
+.modmed-task-label-tag {
+  background-color: #dbeafe;
+  color: #1e40af;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: bold;
+  display: inline-block;
+}
+
+/* Edit / Change Button */
+.modmed-action-btn {
+  background-color: #fff;
+  border: 1px solid #6c757d;
+  color: #6c757d;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.modmed-action-btn:hover {
+  background-color: #e2e8f0;
+  border-color: #007bff;
+}
+
+/* Color Trigger Button */
+.modmed-color-trigger {
+  background-color: #f8f9fa;
+  border: 1px solid #007bff;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #007bff;
+}
+
+.modmed-color-trigger:hover {
+  background-color: #e2e8f0;
+  border-color: #007bff;
+}
+
+.modmed-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.15);
+  display: inline-block;
+}
+
+/* Visual Color Palette Popover */
+.modmed-color-palette-popup {
+  position: absolute;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 10px;
+  z-index: 9999;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modmed-palette-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.modmed-palette-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  transition: transform 0.1s ease;
+}
+
+.modmed-palette-swatch:hover {
+  transform: scale(1.15);
+}
+
+.swatch-none {
+  background-color: #f1f5f9;
+  font-size: 9px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  width: 28px;
+  height: 22px;
+  border-radius: 4px;
+}
+
+.modmed-settings-toggle {
+  font-size: 10px;
+  color: #007bff;
+  cursor: pointer;
+  text-align: right;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.modmed-custom-colors-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 6px;
+}
+
+.modmed-color-input-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: #475569;
+}
+
+.modmed-color-input-row input[type="color"] {
+  border: none;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  background: none;
+}
+
+.modmed-save-colors-btn {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 3px 6px;
+  font-size: 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  margin-top: 2px;
+}
+
+/* Task Hover Preview Tooltip (Aligned to Row on Right Side) */
+.modmed-task-tooltip {
+  position: absolute;
+  right: 25px;
+  width: 320px;
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.3);
+  z-index: 10000;
+  line-height: 1.4;
+  border: 1px solid #334155;
+  pointer-events: none;
+}
+
+.modmed-tooltip-title {
+  font-weight: bold;
+  color: #38bdf8;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #334155;
+  padding-bottom: 4px;
+  font-size: 13px;
+}
+
+/* Snooze Date Popover */
+.snooze-picker-popover {
+  position: absolute;
+  background: #ffffff;
+  border: 1px solid #ccc;
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 10px;
+  z-index: 9999;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 170px;
+}
+
+.snooze-picker-popover input[type="date"],
+.snooze-picker-popover input[type="text"] {
+  padding: 4px;
+  font-size: 11px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.modmed-popover-save {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 3px;
+  cursor: pointer;
+  flex: 1;
+}
+
+.modmed-popover-cancel {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 3px;
+  cursor: pointer;
+  flex: 1;
+}

@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "DanMed",
+  "version": "4.0",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.modmedapp.com/ema/web/practice/staff/*"
+      ],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ]
+}
