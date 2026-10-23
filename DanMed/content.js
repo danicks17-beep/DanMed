@@ -233,10 +233,12 @@ function injectTaskCustomColumns() {
 
   injectCustomColumnHeader();
 
-  chrome.storage.local.get(['snoozedTasks'], (result) => {
+  chrome.storage.local.get(['snoozedTasks', 'taskLabels', 'taskLabelColors'], (result) => {
     if (document.getElementById('active-snooze-popover') || document.querySelector('.modmed-color-palette-popup')) return;
 
     const snoozedTasks = result.snoozedTasks || {};
+    const taskLabels = result.taskLabels || {};
+    const taskLabelColors = result.taskLabelColors || {};
     const rows = document.querySelectorAll('table tbody tr');
 
     rows.forEach((row) => {
@@ -246,22 +248,23 @@ function injectTaskCustomColumns() {
       const snoozeData = snoozedTasks[taskId] || {};
       const now = new Date().getTime();
       const isCurrentlySnoozed = snoozeData.snoozeUntil && new Date(snoozedTasks[taskId].snoozeUntil).getTime() > now;
-      const activeColor = snoozeData.rowColor || '';
+      const activeColor = taskLabelColors[taskId] || '';
+      const newLabelVal = taskLabels[taskId] || '';
 
       applyRowColor(row, activeColor);
 
       // --- A. INJECT SNOOZE BUTTON ---
       let existingWrapper = taskCell.querySelector('.modmed-snooze-wrapper-original');
-      const currentLabelAttr = existingWrapper?.getAttribute('data-label') || '';
-      const newLabelVal = snoozeData.label || '';
+      const currentLabelAttr = existingWrapper?.getAttribute('data-note') || '';
+      const newNoteVal = snoozeData.snoozeNote || '';
       const hasBadge = existingWrapper?.classList.contains('is-snoozed-mode');
 
-      if (!existingWrapper || (hasBadge !== isCurrentlySnoozed) || (currentLabelAttr !== newLabelVal)) {
+      if (!existingWrapper || (hasBadge !== isCurrentlySnoozed) || (currentLabelAttr !== newNoteVal)) {
         if (existingWrapper) existingWrapper.remove();
 
         const wrapper = document.createElement('div');
         wrapper.className = 'modmed-snooze-wrapper-original';
-        wrapper.setAttribute('data-label', newLabelVal);
+        wrapper.setAttribute('data-note', newNoteVal);
 
         if (isCurrentlySnoozed) {
           wrapper.classList.add('is-snoozed-mode');
@@ -376,11 +379,11 @@ function showTaskTooltip(row, taskId, snoozeData) {
   contentEl.innerText = notesText;
   tooltip.appendChild(contentEl);
 
-  if (snoozeData.label) {
+  if (snoozeData.snoozeNote) {
     const labelEl = document.createElement('div');
     labelEl.style.marginTop = '6px';
     labelEl.style.color = '#38bdf8';
-    labelEl.innerText = `Label: ${snoozeData.label}`;
+    labelEl.innerText = `Snooze note: ${snoozeData.snoozeNote}`;
     tooltip.appendChild(labelEl);
   }
 
@@ -488,6 +491,40 @@ function showColorPalettePopup(buttonEl, row, taskId) {
     configContainer.appendChild(saveCustomBtn);
     palette.appendChild(configContainer);
 
+    const labelSection = document.createElement('div');
+    labelSection.className = 'modmed-task-label-editor';
+    const labelTitle = document.createElement('div');
+    labelTitle.innerText = 'Label';
+    labelTitle.className = 'modmed-settings-heading';
+    labelSection.appendChild(labelTitle);
+    const labelInput = document.createElement('input');
+    labelInput.type = 'text';
+    labelInput.placeholder = 'Category label';
+    labelInput.className = 'modmed-label-input';
+    labelSection.appendChild(labelInput);
+    const labelSave = document.createElement('button');
+    labelSave.type = 'button';
+    labelSave.className = 'modmed-save-label-btn';
+    labelSave.innerText = 'Assign Label';
+    labelSave.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const label = labelInput.value.trim();
+      chrome.storage.local.get(['taskLabels'], (stored) => {
+        const labels = stored.taskLabels || {};
+        if (label) labels[taskId] = label;
+        else delete labels[taskId];
+        chrome.storage.local.set({ taskLabels: labels }, () => {
+          palette.remove();
+          setTimeout(injectTaskCustomColumns, 50);
+        });
+      });
+    });
+    labelSection.appendChild(labelSave);
+    chrome.storage.local.get(['taskLabels'], (stored) => {
+      labelInput.value = stored.taskLabels?.[taskId] || '';
+    });
+    palette.appendChild(labelSection);
+
     settingsToggle.addEventListener('click', (e) => {
       e.stopPropagation();
       configContainer.style.display = configContainer.style.display === 'none' ? 'flex' : 'none';
@@ -517,10 +554,10 @@ function showDatePickerPopover(buttonEl, row, existingData = null) {
   popover.id = 'active-snooze-popover';
   popover.className = 'snooze-picker-popover';
 
-  const title = document.createElement('div');
+    const title = document.createElement('div');
   title.style.fontWeight = 'bold';
   title.style.fontSize = '12px';
-  title.innerText = existingData ? 'Edit Snooze / Label' : 'Snooze Task';
+    title.innerText = existingData ? 'Edit Snooze / Note' : 'Snooze Task';
   popover.appendChild(title);
 
   const dateInput = document.createElement('input');
@@ -535,9 +572,9 @@ function showDatePickerPopover(buttonEl, row, existingData = null) {
   popover.appendChild(dateInput);
 
   const labelInput = document.createElement('input');
-  labelInput.type = 'text';
-  labelInput.placeholder = 'Label (e.g. Waiting on Labs)';
-  labelInput.value = existingData ? (existingData.label || '') : '';
+    labelInput.type = 'text';
+    labelInput.placeholder = 'Quick note (optional)';
+    labelInput.value = existingData ? (existingData.snoozeNote || '') : '';
   popover.appendChild(labelInput);
 
   const btnContainer = document.createElement('div');
@@ -551,7 +588,7 @@ function showDatePickerPopover(buttonEl, row, existingData = null) {
     const selectedDate = new Date(dateInput.value);
     const taskId = getTaskIdFromRow(row);
     if (taskId && !isNaN(selectedDate.getTime())) {
-      saveTaskSnoozeAndLabel(taskId, selectedDate, labelInput.value.trim());
+        saveTaskSnoozeAndNote(taskId, selectedDate, labelInput.value.trim());
     }
     popover.remove();
   });
@@ -589,14 +626,14 @@ function showDatePickerPopover(buttonEl, row, existingData = null) {
 }
 
 // Storage helpers
-function saveTaskSnoozeAndLabel(taskId, snoozeUntilDate, label) {
+function saveTaskSnoozeAndNote(taskId, snoozeUntilDate, note) {
   chrome.storage.local.get(['snoozedTasks'], (result) => {
     const snoozedTasks = result.snoozedTasks || {};
     snoozedTasks[taskId] = {
       ...snoozedTasks[taskId],
       snoozeUntil: snoozeUntilDate.toISOString(),
       snoozedAt: new Date().toISOString(),
-      label: label || ''
+      snoozeNote: note || ''
     };
     chrome.storage.local.set({ snoozedTasks }, () => {
       applyTaskFiltering();
@@ -606,13 +643,11 @@ function saveTaskSnoozeAndLabel(taskId, snoozeUntilDate, label) {
 }
 
 function updateTaskColor(taskId, color) {
-  chrome.storage.local.get(['snoozedTasks'], (result) => {
-    const snoozedTasks = result.snoozedTasks || {};
-    if (!snoozedTasks[taskId]) {
-      snoozedTasks[taskId] = {};
-    }
-    snoozedTasks[taskId].rowColor = color;
-    chrome.storage.local.set({ snoozedTasks });
+  chrome.storage.local.get(['taskLabelColors'], (result) => {
+    const taskLabelColors = result.taskLabelColors || {};
+    if (color) taskLabelColors[taskId] = color;
+    else delete taskLabelColors[taskId];
+    chrome.storage.local.set({ taskLabelColors });
   });
 }
 

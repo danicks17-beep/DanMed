@@ -28,4 +28,4 @@ Open **Add Charges**. The OTC Shortcuts sidebar appears inside the dialog. Searc
 
 The extension does not automatically post a charge; users still review and click ModMed's Add Charge or Post buttons.
 
-When Add Charges is open, the catalog also shows best-effort provider/location suggestions from the most recent visible ledger charge. Insurance details are only shown when the current page exposes them; deductible, out-of-pocket, and coinsurance values are not fabricated when ModMed keeps them on the separate Insurance page.
+When Add Charges is open, the catalog is limited to OTC shortcuts and does not add insurance or previous-charge provider/location panels. Task labels are assigned from the Label column picker in the task grid; the Snooze dialog stores only an optional snooze note.
