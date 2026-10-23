@@ -960,7 +960,6 @@ function injectDrawerTriggerButton() {
   targetContainer.style.gap = '6px';
   targetContainer.appendChild(triggerBtn);
 }
-}
 
 function toggleOtcDrawer(open) {
   let drawer = document.getElementById('danmed-otc-drawer');
