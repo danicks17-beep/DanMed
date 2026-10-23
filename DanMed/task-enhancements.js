@@ -171,11 +171,15 @@
     // Fallback path: Select Task Action → Assign to me → Reassign.
     const actionSelect = await waitFor(() => Array.from(document.querySelectorAll('ng-select')).find(select => /Select Task Action/i.test(selectLabel(select))), 2500);
     if (actionSelect) {
+      // Direct path: Select Task Action → Reassign.
+      if (await chooseNgSelect(actionSelect, 'Reassign')) return true;
+      // Alternate path: Select Task Action → Assign to me → Reassign.
       if (!(await chooseNgSelect(actionSelect, 'Assign to me'))) return false;
       status.textContent = 'Selecting Reassign…';
       return chooseActionOption('Reassign');
     }
     if (await clickExact('Select Task Action', 1500)) {
+      if (await clickExact('Reassign', 1800)) return true;
       if (!(await clickExact('Assign to me', 4000))) return false;
       status.textContent = 'Selecting Reassign…';
       return clickExact('Reassign', 4000);
