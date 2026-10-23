@@ -15,7 +15,7 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*.modmedapp.com/*"
+        "https://*.modmedapp.com/ema/web/practice/staff/*"
       ],
       "js": ["content.js"],
       "css": ["styles.css"]
