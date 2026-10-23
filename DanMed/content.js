@@ -3,11 +3,15 @@ function isTasksPage() {
   return window.location.hash.includes('/tasks/manage/');
 }
 
+function danmedElementText(element) {
+  return (element?.innerText || element?.textContent || '').trim();
+}
+
 // Find the task ID anywhere in the row and return the specific cell containing it
 function getTaskCellAndId(row) {
   const cells = row.querySelectorAll('td');
   for (const cell of cells) {
-    const match = cell.innerText.match(/([A-Z]{2,6}-\d+|\d{7,})/);
+    const match = danmedElementText(cell).match(/([A-Z]{2,6}-\d+|\d{7,})/);
     if (match) {
       return { cell, taskId: match[1] };
     }
@@ -29,7 +33,7 @@ function injectCustomColumnHeader() {
   if (customTh) return;
 
   const ths = Array.from(headerRow.querySelectorAll('th'));
-  const priorityTh = ths.find(th => th.innerText.toLowerCase().includes('priority'));
+  const priorityTh = ths.find(th => danmedElementText(th).toLowerCase().includes('priority'));
 
   customTh = document.createElement('th');
   customTh.className = 'modmed-custom-th';
@@ -295,7 +299,7 @@ function injectTaskCustomColumns() {
       const tds = Array.from(row.querySelectorAll('td'));
       const headerRow = document.querySelector('table thead tr');
       const ths = headerRow ? Array.from(headerRow.querySelectorAll('th')) : [];
-      const priorityThIndex = ths.findIndex(th => th.innerText.toLowerCase().includes('priority'));
+      const priorityThIndex = ths.findIndex(th => danmedElementText(th).toLowerCase().includes('priority'));
 
       if (!customCell) {
         customCell = document.createElement('td');
