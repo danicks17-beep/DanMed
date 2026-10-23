@@ -16,7 +16,7 @@
   "content_scripts": [
     {
       "matches": ["https://*.modmedapp.com/ema/web/practice/staff/*"],
-      "js": ["content.js", "danmed-features.js"],
+      "js": ["content.js", "danmed-features.js", "task-enhancements.js"],
       "css": ["styles.css"],
       "run_at": "document_idle"
     }

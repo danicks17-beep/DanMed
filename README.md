@@ -12,6 +12,7 @@ DanMed is a Manifest V3 browser extension for ModMed workflows at USFAS. Version
 - Fax/task type aliases from the Shortcuts userscript.
 - Self-pay override processing using the full CPT charge map from the ViolentMonkey script.
 - A popup settings page with a master switch and an independent toggle for each feature.
+- Task-management helpers that request 100 records per page, hide Due Date, provide labeled/color tabs and filters, and expose a quick reassignment panel on task details.
 
 ## Installation
 
@@ -26,3 +27,5 @@ The extension only matches `https://*.modmedapp.com/ema/web/practice/staff/*`. S
 Open **Add Charges**. The OTC Shortcuts sidebar appears inside the dialog. Search by shortcut name, code, or description. Expand a category and click a product to select it in the real ModMed product field and populate its description and price. Use the star to add or remove Favorites. **+ Add shortcut** lets a user create a custom shortcut with a category, code, description, and optional price.
 
 The extension does not automatically post a charge; users still review and click ModMed's Add Charge or Post buttons.
+
+When Add Charges is open, the catalog also shows best-effort provider/location suggestions from the most recent visible ledger charge. Insurance details are only shown when the current page exposes them; deductible, out-of-pocket, and coinsurance values are not fabricated when ModMed keeps them on the separate Insurance page.
