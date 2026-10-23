@@ -149,6 +149,14 @@
     const target = text.trim().toLowerCase();
     return Array.from(document.querySelectorAll('button, a, [role="button"], [role="option"], li, span, div')).filter(el => visible(el) && !el.closest('.danmed-reassign-panel') && valueText(el).toLowerCase() === target).sort((a, b) => a.textContent.length - b.textContent.length)[0] || null;
   }
+  const TASK_ACTION_BUTTON_SELECTOR = '#app-content > ema-staff-nav-tabs > ema-menu-nav > div > ema-task-detail > div > div > div.container-fluid.fullscreen-header.fullscreen-header-fixed > ema-task-detail-header > div.container > div > div > div > div > button';
+  async function clickTaskActionButton() {
+    const button = await waitFor(() => document.querySelector(TASK_ACTION_BUTTON_SELECTOR), 3000);
+    if (!button || !visible(button)) return false;
+    button.click();
+    await wait(350);
+    return true;
+  }
   async function clickExact(text, timeout = 5000) {
     const el = await waitFor(() => exactText(text), timeout);
     if (!el) return false;
@@ -163,12 +171,17 @@
   }
   async function openReassignPath(status) {
     status.textContent = 'Opening task reassignment…';
-    // Preferred path: visible Assign To Me control, then the Reassign action.
-    if (await clickExact('Assign To Me', 1200)) {
+    // Preferred path: press ModMed's task-action header button, then Assign To Me → Reassign.
+    let menuOpened = await clickTaskActionButton();
+    if (menuOpened && await clickExact('Assign To Me', 2500)) {
       status.textContent = 'Selecting Reassign…';
+      await clickTaskActionButton();
       if (await clickExact('Reassign', 4000)) return true;
     }
-    // Fallback path: Select Task Action → Assign to me → Reassign.
+    // Fallback paths begin by pressing the same header button.
+    if (!menuOpened) menuOpened = await clickTaskActionButton();
+    // Select Task Action → Reassign, or Select Task Action → Assign to me → Reassign.
+    if (menuOpened && await clickExact('Reassign', 1200)) return true;
     const actionSelect = await waitFor(() => Array.from(document.querySelectorAll('ng-select')).find(select => /Select Task Action/i.test(selectLabel(select))), 2500);
     if (actionSelect) {
       // Direct path: Select Task Action → Reassign.
