@@ -12,7 +12,7 @@ DanMed is a Manifest V3 browser extension for ModMed workflows at USFAS. Version
 - Fax/task type aliases from the Shortcuts userscript.
 - Self-pay override processing using the full CPT charge map from the ViolentMonkey script.
 - A popup settings page with a master switch and an independent toggle for each feature.
-- Task-management helpers that request 100 records per page, hide Due Date, provide labeled/color tabs and filters, and expose a quick reassignment panel on task details.
+- Task-management helpers that request 100 records per page, provide labeled/color tabs and filters, and expose a quick reassignment panel on task details.
 
 ## Installation
 

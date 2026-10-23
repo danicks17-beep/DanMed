@@ -18,7 +18,11 @@
   const isTaskDetails = () => /task-details|\/task\/|communication\//i.test(window.location.hash) && !isTasksPage();
   const valueText = el => (el?.innerText || el?.textContent || '').trim();
   const enabled = () => settings.masterEnable && settings.featureTasks !== false;
-  const getTaskData = () => new Promise(resolve => chrome.storage.local.get(['taskLabels', 'taskLabelColors'], result => resolve({ labels: result.taskLabels || {}, colors: result.taskLabelColors || {} })));
+  const getTaskData = () => new Promise(resolve => chrome.storage.local.get(['taskLabels', 'taskLabelColors', 'customPaletteColors', 'customPaletteLabels'], result => {
+    const paletteColors = result.customPaletteColors || ['#fef08a', '#bbf7d0', '#bae6fd', '#fbcfe8', '#fed7aa'];
+    const savedLabels = result.customPaletteLabels || [];
+    resolve({ labels: result.taskLabels || {}, colors: result.taskLabelColors || {}, paletteColors, paletteLabels: paletteColors.map((_, index) => savedLabels[index] || `Color ${index + 1}`) });
+  }));
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const waitFor = async (fn, timeout = 5000, interval = 100) => { const end = Date.now() + timeout; while (Date.now() < end) { const value = fn(); if (value) return value; await wait(interval); } return null; };
 
@@ -57,17 +61,8 @@
     if (native) { const option = Array.from(native.options).find(item => item.value === '100' || valueText(item) === '100'); if (option && native.value !== option.value) { native.value = option.value; native.dispatchEvent(new Event('change', { bubbles: true })); } }
     const ng = Array.from(document.querySelectorAll('ng-select')).find(select => /View Records By/i.test(selectLabel(select))); if (ng && !/100/.test(valueText(ng))) chooseNgSelect(ng, '100');
   }
-  function hideDueDateColumn() {
-    if (!isTasksPage()) return;
-    const header = Array.from(document.querySelectorAll('table thead th')).find(th => /^Due Date$/i.test(valueText(th)));
-    if (!header) return;
-    const index = Array.from(header.parentElement.children).indexOf(header);
-    header.style.display = 'none';
-    header.parentElement.parentElement.querySelectorAll('tbody tr').forEach(row => { if (row.children[index]) row.children[index].style.display = 'none'; });
-  }
-
   function taskId(row) { return typeof getTaskIdFromRow === 'function' ? getTaskIdFromRow(row) : null; }
-  function labelNames(labels) { return [...new Set(Object.values(labels).filter(Boolean))].sort((a, b) => a.localeCompare(b)); }
+  function labelNames(data) { return [...new Set([...Object.values(data.labels), ...data.paletteLabels].filter(Boolean))].sort((a, b) => a.localeCompare(b)); }
   function applyLabelFilter(label, labels) {
     document.querySelectorAll('table tbody tr').forEach(row => {
       const id = taskId(row);
@@ -83,25 +78,29 @@
     const tablist = document.querySelector('ul[role="tablist"]');
     const snoozed = document.getElementById('snoozed-tab-btn');
     if (!tablist || !snoozed) return;
-    const labels = labelNames(data.labels);
+    const labels = [...new Set(Object.values(data.labels).filter(Boolean))].sort((a, b) => a.localeCompare(b));
     tablist.querySelectorAll('.danmed-label-tab').forEach(tab => { if (!labels.includes(tab.dataset.label)) tab.remove(); });
     labels.forEach(label => {
       let tab = Array.from(tablist.querySelectorAll('.danmed-label-tab')).find(item => item.dataset.label === label);
       if (!tab) {
-        tab = document.createElement('li');
-        tab.className = 'danmed-label-tab';
+        tab = snoozed.cloneNode(true);
+        tab.removeAttribute('id');
+        tab.classList.add('danmed-label-tab');
         tab.dataset.label = label;
-        const link = document.createElement('a');
+        const link = tab.querySelector('a, button, span, div') || tab;
+        link.innerHTML = '';
         link.href = '#';
         link.setAttribute('role', 'tab');
-        link.className = 'danmed-label-tab-link';
+        link.classList.add('danmed-label-tab-link');
         link.innerHTML = '<span class="danmed-label-dot"></span><span class="danmed-label-name"></span>';
         link.querySelector('.danmed-label-name').textContent = label;
         link.addEventListener('click', event => {
           event.preventDefault();
           event.stopPropagation();
           tablist.querySelectorAll('li').forEach(item => item.classList.remove('active', 'selected'));
+          tablist.querySelectorAll('li a, li button').forEach(item => item.classList.remove('active', 'selected'));
           tab.classList.add('active');
+          link.classList.add('active');
           sessionStorage.setItem('danmed_active_label', label);
           applyLabelFilter(label, data.labels);
         });
@@ -113,23 +112,27 @@
   }
   function injectLabelFilters(data) {
     if (!isTasksPage()) return;
-    const labels = labelNames(data.labels);
+    const labels = labelNames(data);
     const anchor = Array.from(document.querySelectorAll('button, div, span')).find(el => /^Filters$/i.test(valueText(el)));
     const host = anchor?.parentElement;
     if (!host) return;
     let box = host.querySelector('.danmed-label-filters');
     if (!labels.length) { box?.remove(); return; }
-    if (!box) { box = document.createElement('div'); box.className = 'danmed-label-filters'; host.appendChild(box); }
+    if (!box) { box = document.createElement('div'); box.className = 'danmed-label-filters'; anchor.insertAdjacentElement('afterend', box); }
     box.innerHTML = '<strong>Labels:</strong>';
     labels.forEach(label => {
       const labelEl = document.createElement('label');
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox'; checkbox.checked = true; checkbox.dataset.label = label;
+      const dot = document.createElement('span');
+      dot.className = 'danmed-label-dot';
+      const paletteIndex = data.paletteLabels.indexOf(label);
+      dot.style.backgroundColor = paletteIndex >= 0 ? data.paletteColors[paletteIndex] : '#cbd5e1';
       checkbox.addEventListener('change', () => {
         const selected = [...box.querySelectorAll('input:checked')].map(input => input.dataset.label);
         document.querySelectorAll('table tbody tr').forEach(row => { const id = taskId(row); row.style.display = data.labels[id] && !selected.includes(data.labels[id]) ? 'none' : ''; });
       });
-      labelEl.append(checkbox, document.createTextNode(label)); box.appendChild(labelEl);
+      labelEl.append(checkbox, dot, document.createTextNode(label)); box.appendChild(labelEl);
     });
   }
 
@@ -157,16 +160,17 @@
     }, 3000);
     if (!button || !visible(button)) return false;
     button.click();
-    await wait(350);
-    return true;
+    return Boolean(await waitFor(() => {
+      const menu = document.querySelector('[data-identifier="dropdown-basic"]');
+      return menu && visible(menu) && menu.getAttribute('aria-hidden') !== 'true' ? menu : null;
+    }, 4000));
   }
   async function clickTaskAction(action) {
     const identifier = `task-action-${action}`;
     const item = await waitFor(() => document.querySelector(`[data-identifier="${identifier}"]`), 4000);
     if (!item || !visible(item)) return false;
     item.click();
-    await wait(350);
-    return true;
+    return Boolean(await waitFor(() => document.querySelector('[role="dialog"]') || !document.querySelector(`[data-identifier="${identifier}"]`), 4000));
   }
   async function clickExact(text, timeout = 5000) {
     const el = await waitFor(() => exactText(text), timeout);
@@ -284,7 +288,7 @@
     if (!isTasksPage() && !isTaskDetails()) { removeTaskEnhancements(); return; }
     if (isTasksPage()) {
       document.querySelectorAll('.danmed-reassign-panel, .danmed-last-visit').forEach(el => el.remove());
-      setTaskPageSize(); hideDueDateColumn();
+      setTaskPageSize();
       getTaskData().then(data => { injectLabelTabs(data); injectLabelFilters(data); });
     } else {
       document.querySelectorAll('.danmed-label-tab, .danmed-label-filters').forEach(el => el.remove());
