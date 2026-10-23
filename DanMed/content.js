@@ -935,14 +935,18 @@ const otcCategories = [
 ];
 
 function injectDrawerTriggerButton() {
-  // Target the product search input or wrapper inside the active charge row/modal
-  const productInput = document.querySelector('input[aria-label*="Product"], ng-select input[type="text"], input[placeholder*="Search"]');
-  if (!productInput || document.getElementById('danmed-launch-drawer')) return;
+  // Check if we are inside the Add Charge modal/section
+  const chargeModal = document.querySelector('mmpm-charge-product-selector, .modal-content, [id*="charge"]');
+  if (!chargeModal || document.getElementById('danmed-launch-drawer')) return;
 
-  const targetContainer = productInput.closest('td') || productInput.parentElement;
-  if (!targetContainer) return;
+  // Find the button area container (near [Add Discount] or the bottom post buttons)
+  const actionContainer = chargeModal.querySelector('.modal-footer, .button-row, div:has(> [Post Charges & Close])') || 
+                          chargeModal.querySelector('div:has(> [Cancel])') ||
+                          chargeModal.querySelector('mmpm-charge-product-selector').parentElement;
+                          
+  if (!actionContainer) return;
 
-  // Create trigger button
+  // Create the trigger button
   const triggerBtn = document.createElement('button');
   triggerBtn.id = 'danmed-launch-drawer';
   triggerBtn.className = 'danmed-open-drawer-btn';
@@ -954,11 +958,25 @@ function injectDrawerTriggerButton() {
     toggleOtcDrawer(true);
   });
 
-  // Ensure container is flex and inject the button cleanly next to the input
-  targetContainer.style.display = 'flex';
-  targetContainer.style.alignItems = 'center';
-  targetContainer.style.gap = '6px';
-  targetContainer.appendChild(triggerBtn);
+  // Style it nicely so it fits right into the ModMed layout toolbar
+  triggerBtn.style.cssText = `
+    background-color: #502d7f;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    margin: 8px 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  `;
+
+  // Insert it cleanly under the charge items container
+  actionContainer.prepend(triggerBtn);
 }
 
 function toggleOtcDrawer(open) {
