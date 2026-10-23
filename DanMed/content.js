@@ -409,10 +409,9 @@ function removeTaskTooltip() {
 function showColorPalettePopup(buttonEl, row, taskId) {
   document.querySelectorAll('.modmed-color-palette-popup, .snooze-picker-popover').forEach(el => el.remove());
 
-  chrome.storage.local.get(['customPaletteColors', 'customPaletteLabels'], (result) => {
+  chrome.storage.local.get(['customPaletteColors'], (result) => {
     const defaultColors = ['#fef08a', '#bbf7d0', '#bae6fd', '#fbcfe8', '#fed7aa'];
     const userColors = result.customPaletteColors || defaultColors;
-    const userLabels = result.customPaletteLabels || [];
 
     const palette = document.createElement('div');
     palette.className = 'modmed-color-palette-popup';
@@ -434,26 +433,20 @@ function showColorPalettePopup(buttonEl, row, taskId) {
     swatchRow.appendChild(noneSwatch);
 
     userColors.forEach((colorVal, index) => {
-      const choice = document.createElement('div');
-      choice.className = 'modmed-palette-choice';
       const swatch = document.createElement('div');
       swatch.className = 'modmed-palette-swatch';
       swatch.style.backgroundColor = colorVal;
-      swatch.title = userLabels[index] || `Color ${index + 1}`;
-      const choiceLabel = document.createElement('span');
-      choiceLabel.textContent = userLabels[index] || `Color ${index + 1}`;
+      swatch.title = `Color ${index + 1}`;
 
       swatch.addEventListener('click', (e) => {
         e.stopPropagation();
         applyRowColor(row, colorVal);
         updateTaskColor(taskId, colorVal);
-        updateTaskLabel(taskId, userLabels[index] || '');
         palette.remove();
         setTimeout(injectTaskCustomColumns, 50);
       });
 
-      choice.append(swatch, choiceLabel);
-      swatchRow.appendChild(choice);
+      swatchRow.appendChild(swatch);
     });
 
     palette.appendChild(swatchRow);
@@ -468,13 +461,12 @@ function showColorPalettePopup(buttonEl, row, taskId) {
     configContainer.style.display = 'none';
 
     const colorInputs = [];
-    const labelInputs = [];
     userColors.forEach((colorVal, index) => {
       const inputRow = document.createElement('div');
       inputRow.className = 'modmed-color-input-row';
 
       const label = document.createElement('span');
-      label.innerText = `Color ${index + 1}`;
+      label.innerText = `Color ${index + 1}:`;
 
       const colorInput = document.createElement('input');
       colorInput.type = 'color';
@@ -482,15 +474,8 @@ function showColorPalettePopup(buttonEl, row, taskId) {
 
       inputRow.appendChild(label);
       inputRow.appendChild(colorInput);
-      const paletteLabelInput = document.createElement('input');
-      paletteLabelInput.type = 'text';
-      paletteLabelInput.placeholder = 'Set label';
-      paletteLabelInput.value = userLabels[index] || '';
-      paletteLabelInput.className = 'modmed-palette-label-input';
-      inputRow.appendChild(paletteLabelInput);
       configContainer.appendChild(inputRow);
       colorInputs.push(colorInput);
-      labelInputs.push(paletteLabelInput);
     });
 
     const saveCustomBtn = document.createElement('button');
@@ -499,8 +484,7 @@ function showColorPalettePopup(buttonEl, row, taskId) {
     saveCustomBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       const newColors = colorInputs.map(input => input.value);
-      const newLabels = labelInputs.map(input => input.value.trim());
-      chrome.storage.local.set({ customPaletteColors: newColors, customPaletteLabels: newLabels }, () => {
+      chrome.storage.local.set({ customPaletteColors: newColors }, () => {
         palette.remove();
       });
     });
@@ -664,15 +648,6 @@ function updateTaskColor(taskId, color) {
     if (color) taskLabelColors[taskId] = color;
     else delete taskLabelColors[taskId];
     chrome.storage.local.set({ taskLabelColors });
-  });
-}
-
-function updateTaskLabel(taskId, label) {
-  chrome.storage.local.get(['taskLabels'], (result) => {
-    const taskLabels = result.taskLabels || {};
-    if (label) taskLabels[taskId] = label;
-    else delete taskLabels[taskId];
-    chrome.storage.local.set({ taskLabels });
   });
 }
 

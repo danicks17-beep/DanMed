@@ -125,11 +125,9 @@
 
 .modmed-palette-row {
   display: flex;
-  flex-direction: column;
   gap: 6px;
-  align-items: stretch;
+  align-items: center;
 }
-.modmed-palette-choice { display: flex; align-items: center; gap: 7px; min-height: 24px; color: #475569; font-size: 11px; cursor: pointer; }.modmed-palette-choice .modmed-palette-swatch { flex: 0 0 auto; }.modmed-palette-choice span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .modmed-palette-swatch {
   width: 22px;
@@ -178,9 +176,8 @@
 
 .modmed-color-input-row {
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
   align-items: center;
-  gap: 6px;
   font-size: 10px;
   color: #475569;
 }
@@ -192,7 +189,6 @@
   cursor: pointer;
   background: none;
 }
-.modmed-palette-label-input { width: 110px; box-sizing: border-box; padding: 4px 5px; border: 1px solid #cbd5e1; border-radius: 3px; font-size: 10px; }
 
 .modmed-save-colors-btn {
   background: #28a745;
