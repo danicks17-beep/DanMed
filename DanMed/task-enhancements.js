@@ -144,19 +144,79 @@
     card.append(title, value); document.body.appendChild(card);
   }
 
+  function visible(el) { return el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden' && getComputedStyle(el).display !== 'none'; }
+  function exactText(text) {
+    const target = text.trim().toLowerCase();
+    return Array.from(document.querySelectorAll('button, a, [role="button"], [role="option"], li, span, div')).filter(el => visible(el) && !el.closest('.danmed-reassign-panel') && valueText(el).toLowerCase() === target).sort((a, b) => a.textContent.length - b.textContent.length)[0] || null;
+  }
+  async function clickExact(text, timeout = 5000) {
+    const el = await waitFor(() => exactText(text), timeout);
+    if (!el) return false;
+    el.click();
+    await wait(250);
+    return true;
+  }
+  async function chooseActionOption(optionText) {
+    const actionSelect = Array.from(document.querySelectorAll('ng-select')).find(select => /Select Task Action/i.test(selectLabel(select)));
+    if (actionSelect) return chooseNgSelect(actionSelect, optionText);
+    return clickExact(optionText);
+  }
+  async function openReassignPath(status) {
+    status.textContent = 'Opening task reassignment…';
+    // Preferred path: visible Assign To Me control, then the Reassign action.
+    if (await clickExact('Assign To Me', 1200)) {
+      status.textContent = 'Selecting Reassign…';
+      if (await clickExact('Reassign', 4000)) return true;
+    }
+    // Fallback path: Select Task Action → Assign to me → Reassign.
+    const actionSelect = await waitFor(() => Array.from(document.querySelectorAll('ng-select')).find(select => /Select Task Action/i.test(selectLabel(select))), 2500);
+    if (actionSelect) {
+      if (!(await chooseNgSelect(actionSelect, 'Assign to me'))) return false;
+      status.textContent = 'Selecting Reassign…';
+      return chooseActionOption('Reassign');
+    }
+    if (await clickExact('Select Task Action', 1500)) {
+      if (!(await clickExact('Assign to me', 4000))) return false;
+      status.textContent = 'Selecting Reassign…';
+      return clickExact('Reassign', 4000);
+    }
+    return false;
+  }
+  async function fillAssignee(search) {
+    const assignTo = await waitFor(() => findSelect(/^(Assign To|Assigned To)\b/i), 5000);
+    if (assignTo) return chooseNgSelect(assignTo, search);
+    const native = findNativeSelect(/^(Assign To|Assigned To)\b/i);
+    if (native) {
+      const option = Array.from(native.options).find(item => valueText(item).toLowerCase().includes(search.toLowerCase()) || item.value === search);
+      if (!option) return false;
+      native.value = option.value;
+      native.dispatchEvent(new Event('change', { bubbles: true }));
+      await wait(250);
+      return true;
+    }
+    if (!(await clickExact('Assign To', 4000))) return false;
+    const input = await waitFor(() => Array.from(document.querySelectorAll('input[type="text"], input[type="search"]')).find(candidate => visible(candidate) && !candidate.closest('.danmed-reassign-panel')), 3000);
+    if (!input) return false;
+    setNativeValue(input, search);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    const option = await waitFor(() => Array.from(document.querySelectorAll('ng-dropdown-panel .ng-option, [role="option"]')).find(item => visible(item) && valueText(item).toLowerCase().includes(search.toLowerCase())), 5000);
+    if (!option) return false;
+    fire(option);
+    await wait(250);
+    return true;
+  }
   async function reassignTask(search, status) {
     if (reassignmentBusy) return;
     reassignmentBusy = true;
-    status.textContent = 'Opening reassignment…';
     try {
-      const action = await waitFor(() => Array.from(document.querySelectorAll('ng-select')).find(select => /Select Task Action/i.test(selectLabel(select))));
-      if (!action || !(await chooseNgSelect(action, 'Reassign'))) throw new Error('Reassign action was not available');
-      const assignTo = await waitFor(() => findSelect(/^(Assign To|Assigned To)\b/i), 5000);
-      if (!assignTo || !(await chooseNgSelect(assignTo, search))) throw new Error('Assign To selector was not available');
-      const selected = valueText(assignTo);
-      if (!selected.toLowerCase().includes(search.toLowerCase().split(',')[0].toLowerCase())) throw new Error('Assignee selection was not confirmed');
-      const save = await waitFor(() => Array.from(document.querySelectorAll('button, a, input[type="button"]')).find(button => /^Save$/i.test(valueText(button) || button.value) && !button.disabled), 5000);
-      if (!save) throw new Error('Save button was not available after selecting the assignee');
+      if (!(await openReassignPath(status))) throw new Error('Could not complete Assign To Me / Select Task Action → Reassign');
+      status.textContent = 'Selecting Assign To…';
+      if (!(await fillAssignee(search))) throw new Error('Assign To dropdown or staff option was not available');
+      const selected = valueText(findSelect(/^(Assign To|Assigned To)\b/i));
+      if (selected && !selected.toLowerCase().includes(search.toLowerCase().split(',')[0].toLowerCase())) throw new Error('Staff member was not confirmed in Assign To');
+      const save = await waitFor(() => Array.from(document.querySelectorAll('button, a, input[type="button"]')).find(button => visible(button) && /^Save$/i.test(valueText(button) || button.value) && !button.disabled), 5000);
+      if (!save) throw new Error('Save was not available after selecting the staff member');
       status.textContent = 'Saving reassignment…';
       save.click();
       await wait(500);
