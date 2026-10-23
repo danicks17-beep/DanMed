@@ -1,7 +1,8 @@
 {
   "manifest_version": 3,
   "name": "DanMed",
-  "version": "4.5",
+  "version": "5.0",
+  "description": "DanMed workflow shortcuts and ModMed enhancements.",
   "permissions": ["storage"],
   "action": {
     "default_icon": "icon.png",
@@ -14,11 +15,10 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "https://*.modmedapp.com/ema/web/practice/staff/*"
-      ],
-      "js": ["content.js"],
-      "css": ["styles.css"]
+      "matches": ["https://*.modmedapp.com/ema/web/practice/staff/*"],
+      "js": ["content.js", "danmed-features.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
     }
   ]
 }

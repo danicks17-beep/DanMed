@@ -60,8 +60,11 @@ function applyRowColor(row, color) {
 // Listen for live toggle updates from the popup menu instantly
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'SETTINGS_UPDATED') {
-    if (!message.settings.masterEnable || !message.settings.featureHover) {
+    if (!message.settings.masterEnable || !message.settings.featureHover || message.settings.featureTasks === false) {
       removeTaskTooltip();
+    }
+    if (!message.settings.masterEnable || message.settings.featureTasks === false) {
+      document.querySelectorAll('.modmed-custom-th, .modmed-custom-cell, #snoozed-tab-btn, .modmed-snooze-wrapper-original').forEach(el => el.remove());
     }
   }
 });
@@ -79,7 +82,7 @@ function captureTaskNotesFromDetails() {
 
   for (const el of allElements) {
     const text = el.innerText || '';
-    
+
     if (text.includes('Task Note') && text.includes('|')) {
       const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
       const headerLine = lines.find(l => l.includes('Task Note'));
@@ -93,7 +96,7 @@ function captureTaskNotesFromDetails() {
 
         const headerIndex = lines.indexOf(headerLine);
         const bodyLines = [];
-        
+
         for (let i = headerIndex + 1; i < lines.length; i++) {
           let line = lines[i];
           if (line.includes('Task Note') || line.includes('Task History')) {
@@ -116,7 +119,7 @@ function captureTaskNotesFromDetails() {
 
   if (latestNoteFormatted && latestNoteFormatted.length > 3) {
     saveCachedTaskNotes(taskId, latestNoteFormatted);
-    
+
     const gridTaskId = sessionStorage.getItem('modmed_last_grid_task_id');
     if (gridTaskId && gridTaskId !== taskId) {
       saveCachedTaskNotes(gridTaskId, latestNoteFormatted);
@@ -130,13 +133,13 @@ function saveCachedTaskNotes(taskId, notes) {
     if (!snoozedTasks[taskId]) {
       snoozedTasks[taskId] = {};
     }
-    
-    const timestamp = new Date().toLocaleString([], { 
-      month: '2-digit', 
-      day: '2-digit', 
-      year: 'numeric', 
-      hour: 'numeric', 
-      minute: '2-digit' 
+
+    const timestamp = new Date().toLocaleString([], {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
     });
 
     if (snoozedTasks[taskId].cachedNotes !== notes || !snoozedTasks[taskId].lastChecked) {
@@ -153,7 +156,7 @@ document.addEventListener('mouseover', (e) => {
     removeTaskTooltip();
     return;
   }
-  
+
   chrome.storage.local.get(['extensionSettings'], (result) => {
     const settings = result.extensionSettings || { masterEnable: true, featureHover: true };
     if (!settings.masterEnable || !settings.featureHover) return;
@@ -186,7 +189,7 @@ document.addEventListener('mouseout', (e) => {
 window.addEventListener('hashchange', () => {
   window.currentHoveredRow = null;
   removeTaskTooltip();
-  
+
   if (isTasksPage()) {
     setTimeout(() => {
       const activeTab = sessionStorage.getItem('modmed_active_task_tab');
@@ -326,7 +329,7 @@ function injectTaskCustomColumns() {
         colorBtn.type = 'button';
         colorBtn.title = 'Change Row Color';
         colorBtn.setAttribute('data-color', activeColor);
-        
+
         const dot = document.createElement('span');
         dot.className = 'modmed-color-dot';
         dot.style.backgroundColor = activeColor || '#cbd5e1';
@@ -358,7 +361,7 @@ function showTaskTooltip(row, taskId, snoozeData) {
 
   const tooltip = document.createElement('div');
   tooltip.className = 'modmed-task-tooltip';
-  
+
   const titleEl = document.createElement('div');
   titleEl.className = 'modmed-tooltip-title';
   titleEl.innerHTML = `<span style="font-weight: bold; display: block;">Most Recently Viewed Task Note</span> ${lastCheckedTime}`;
@@ -454,14 +457,14 @@ function showColorPalettePopup(buttonEl, row, taskId) {
     userColors.forEach((colorVal, index) => {
       const inputRow = document.createElement('div');
       inputRow.className = 'modmed-color-input-row';
-      
+
       const label = document.createElement('span');
       label.innerText = `Color ${index + 1}:`;
-      
+
       const colorInput = document.createElement('input');
       colorInput.type = 'color';
       colorInput.value = colorVal;
-      
+
       inputRow.appendChild(label);
       inputRow.appendChild(colorInput);
       configContainer.appendChild(inputRow);
@@ -643,7 +646,7 @@ function injectSnoozedTab() {
 
   const childText = snoozedTabItem.querySelector('a, span, div') || snoozedTabItem;
   childText.innerText = 'Snoozed';
-  
+
   snoozedTabItem.classList.remove('active', 'selected');
   childText.classList.remove('active', 'selected');
 
@@ -730,7 +733,7 @@ function renderSnoozedView() {
         row.style.display = 'none';
       }
     });
-    
+
     injectTaskCustomColumns();
   });
 }
@@ -754,16 +757,25 @@ const observer = new MutationObserver(() => {
     removeTaskTooltip();
     return;
   }
-  
-  if (document.getElementById('active-snooze-popover') || document.querySelector('.modmed-color-palette-popup')) return;
-  if (observerTimeout) return;
-  
-  observerTimeout = setTimeout(() => {
-    observerTimeout = null;
-    injectSnoozedTab();
-    injectTaskCustomColumns();
-    applyTaskFiltering();
-  }, 300);
+
+  chrome.storage.local.get(['extensionSettings'], (result) => {
+    const taskSettings = result.extensionSettings || { masterEnable: true, featureTasks: true };
+    if (!taskSettings.masterEnable || taskSettings.featureTasks === false) {
+      removeTaskTooltip();
+      document.querySelectorAll('.modmed-custom-th, .modmed-custom-cell, #snoozed-tab-btn, .modmed-snooze-wrapper-original').forEach(el => el.remove());
+      return;
+    }
+
+    if (document.getElementById('active-snooze-popover') || document.querySelector('.modmed-color-palette-popup')) return;
+    if (observerTimeout) return;
+
+    observerTimeout = setTimeout(() => {
+      observerTimeout = null;
+      injectSnoozedTab();
+      injectTaskCustomColumns();
+      applyTaskFiltering();
+    }, 300);
+  });
 });
 
 observer.observe(document.body, { childList: true, subtree: true });

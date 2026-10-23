@@ -1,35 +1,34 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const masterEnable = document.getElementById('masterEnable');
-  const featureHover = document.getElementById('featureHover');
+  const defaults = {
+    masterEnable: true,
+    featureHover: true,
+    featureTasks: true,
+    featureAppointments: true,
+    featureCharges: true,
+    featureInsurance: true,
+    featureLocation: true,
+    featureStaff: true,
+    featureFaxLabels: true,
+    featureSelfPay: true
+  };
+  const ids = Object.keys(defaults);
+  const controls = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+  const status = document.getElementById('status');
 
-  const toggles = [masterEnable, featureHover];
-
-  // Load saved states from storage
-  chrome.storage.local.get(['extensionSettings'], (result) => {
-    const settings = result.extensionSettings || {
-      masterEnable: true,
-      featureHover: true
-    };
-
-    masterEnable.checked = settings.masterEnable;
-    featureHover.checked = settings.featureHover;
+  chrome.storage.local.get(['extensionSettings'], result => {
+    const settings = { ...defaults, ...(result.extensionSettings || {}) };
+    ids.forEach(id => { controls[id].checked = Boolean(settings[id]); });
   });
 
-  // Listen for changes and save to storage
-  toggles.forEach(toggle => {
-    toggle.addEventListener('change', () => {
-      const settings = {
-        masterEnable: masterEnable.checked,
-        featureHover: featureHover.checked
-      };
-
-      chrome.storage.local.set({ extensionSettings: settings }, () => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (tabs[0]?.id) {
-            chrome.tabs.sendMessage(tabs[0].id, { type: 'SETTINGS_UPDATED', settings });
-          }
-        });
+  ids.forEach(id => controls[id].addEventListener('change', () => {
+    const settings = Object.fromEntries(ids.map(key => [key, controls[key].checked]));
+    chrome.storage.local.set({ extensionSettings: settings }, () => {
+      status.textContent = 'Saved';
+      setTimeout(() => { status.textContent = ''; }, 900);
+      chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+        const tabId = tabs[0]?.id;
+        if (tabId) chrome.tabs.sendMessage(tabId, { type: 'SETTINGS_UPDATED', settings }).catch(() => {});
       });
     });
-  });
+  }));
 });
