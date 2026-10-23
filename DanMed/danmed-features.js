@@ -115,14 +115,17 @@
     const label = group?.querySelector('label, .ng-label, .form-label') || select.previousElementSibling;
     return `${text(label)} ${select.querySelector('.ng-placeholder, input')?.getAttribute('placeholder') || ''}`.trim();
   }
+  function isCancellationSelect(select) {
+    return /(?:reason\s+for\s+)?cancell?ation\s+reason|reason\s+for\s+cancell?ation/i.test(selectLabel(select));
+  }
   function activeNgSelect(labelPattern) {
-    return Array.from(document.querySelectorAll('ng-select.ng-select-opened')).find(select => labelPattern.test(selectLabel(select))) || null;
+    return Array.from(document.querySelectorAll('ng-select.ng-select-opened')).find(select => !isCancellationSelect(select) && labelPattern.test(selectLabel(select))) || null;
   }
   function addNgShortcuts(select, title, items, marker) {
     const panel = document.querySelector('ng-dropdown-panel'); const host = panel?.querySelector('.scroll-host');
     if (!panel || !host || panel.dataset[marker]) return;
     panel.dataset[marker] = 'true';
-    const wrapper = document.createElement('div'); wrapper.className = 'danmed-dropdown-shortcuts';
+    const wrapper = document.createElement('div'); wrapper.className = 'danmed-dropdown-shortcuts'; wrapper.dataset.danmedShortcutScope = marker;
     const header = document.createElement('div'); header.className = 'danmed-dropdown-title'; header.textContent = title; wrapper.appendChild(header);
     const filter = document.createElement('input'); filter.type = 'search'; filter.className = 'danmed-shortcut-filter'; filter.placeholder = 'Filter shortcuts…'; wrapper.appendChild(filter);
     const itemsBox = document.createElement('div'); itemsBox.className = 'danmed-dropdown-items'; wrapper.appendChild(itemsBox);
@@ -145,7 +148,17 @@
     });
   }
   function renderDropdownShortcuts() {
-    if (!enabled('featureLocation') && !enabled('featureStaff')) { document.querySelectorAll('.danmed-dropdown-shortcuts').forEach(el => el.remove()); return; }
+    const removeScope = (scope) => document.querySelectorAll(`.danmed-dropdown-shortcuts[data-danmed-shortcut-scope="${scope}"]`).forEach(el => {
+      const panel = el.closest('ng-dropdown-panel');
+      el.remove();
+      if (panel) delete panel.dataset[scope];
+    });
+    if (!enabled('featureLocation')) removeScope('danmedLocationAdded');
+    if (!enabled('featureStaff')) {
+      removeScope('danmedStaffAdded');
+      removeScope('danmedProviderAdded');
+    }
+    if (!enabled('featureLocation') && !enabled('featureStaff')) return;
     if (enabled('featureLocation')) { const select = activeNgSelect(/Search Location|^Location\b/i); if (select) addNgShortcuts(select, 'Quick Location', LOCATION_SHORTCUTS, 'danmedLocationAdded'); }
     if (enabled('featureStaff')) {
       const taskStaff = activeNgSelect(/^(Staff|Assigned To|Select Staff|Task Staff)\b/i);
@@ -186,7 +199,30 @@
     search.addEventListener('input', render); document.body.appendChild(sidebar); renderChargeSuggestions(dialog); renderInsuranceSummary(dialog); render();
   }
 
-  function renderFaxLabels() { if (!enabled('featureFaxLabels')) return; const container = document.querySelector('typeahead-container'); if (!container) return; container.querySelectorAll('li span').forEach(span => { const original = text(span); const replacement = FAX_LABELS[original]; if (!replacement) return; span.textContent = replacement; const link = span.closest('a'); if (link && !link.dataset.danmedFaxHooked) { link.dataset.danmedFaxHooked = 'true'; link.addEventListener('mousedown', () => setTimeout(() => { const input = document.querySelector('input[data-identifier="create-task-details"]'); if (input) { setNativeValue(input, replacement); emit(input); emit(input, 'change'); input.blur(); } }, 10), true); } }); }
+  function renderFaxLabels() {
+    const spans = document.querySelectorAll('typeahead-container li span');
+    if (!enabled('featureFaxLabels')) {
+      spans.forEach(span => {
+        if (span.dataset.danmedOriginalText) span.textContent = span.dataset.danmedOriginalText;
+      });
+      return;
+    }
+    spans.forEach(span => {
+      const original = span.dataset.danmedOriginalText || text(span);
+      const replacement = FAX_LABELS[original];
+      if (!replacement) return;
+      span.dataset.danmedOriginalText = original;
+      span.textContent = replacement;
+      const link = span.closest('a');
+      if (link && !link.dataset.danmedFaxHooked) {
+        link.dataset.danmedFaxHooked = 'true';
+        link.addEventListener('mousedown', () => setTimeout(() => {
+          const input = document.querySelector('input[data-identifier="create-task-details"]');
+          if (input) { setNativeValue(input, replacement); emit(input); emit(input, 'change'); input.blur(); }
+        }, 10), true);
+      }
+    });
+  }
 
   const SELF_PAY_CHARGE_MAP = {
         '10061': '200.00', '10120': '100.00', '10121': '200.00', '10140': '200.00',
