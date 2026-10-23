@@ -1,12 +1,21 @@
 {
   "manifest_version": 3,
   "name": "DanMed",
-  "version": "4.0",
+  "version": "4.5",
   "permissions": ["storage"],
+  "action": {
+    "default_icon": "icon.png",
+    "default_popup": "popup.html"
+  },
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  },
   "content_scripts": [
     {
       "matches": [
-        "https://*.modmedapp.com/ema/web/practice/staff/*"
+        "*://*.modmedapp.com/*"
       ],
       "js": ["content.js"],
       "css": ["styles.css"]

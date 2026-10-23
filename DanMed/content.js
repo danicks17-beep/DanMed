@@ -33,7 +33,7 @@ function injectCustomColumnHeader() {
 
   customTh = document.createElement('th');
   customTh.className = 'modmed-custom-th';
-  customTh.innerText = 'Snooze / Label';
+  customTh.innerText = 'Label';
 
   if (priorityTh) {
     priorityTh.insertAdjacentElement('afterend', customTh);
@@ -57,6 +57,15 @@ function applyRowColor(row, color) {
   }
 }
 
+// Listen for live toggle updates from the popup menu instantly
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === 'SETTINGS_UPDATED') {
+    if (!message.settings.masterEnable || !message.settings.featureHover) {
+      removeTaskTooltip();
+    }
+  }
+});
+
 // --- PRECISE DOM SCRAPER FOR MODMED TASK DETAILS ---
 function captureTaskNotesFromDetails() {
   const hash = window.location.hash || '';
@@ -65,20 +74,53 @@ function captureTaskNotesFromDetails() {
 
   if (!taskId) return;
 
-  const headings = Array.from(document.querySelectorAll('div, span, b, p, label, h3, h4'));
-  const notesHeading = headings.find(el => el.innerText && el.innerText.trim() === 'Notes' && el.children.length === 0);
+  const allElements = Array.from(document.querySelectorAll('div, span, p'));
+  let latestNoteFormatted = '';
 
-  if (!notesHeading) return;
+  for (const el of allElements) {
+    const text = el.innerText || '';
+    
+    if (text.includes('Task Note') && text.includes('|')) {
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      const headerLine = lines.find(l => l.includes('Task Note'));
 
-  const container = notesHeading.closest('.panel, .card, div') || notesHeading.parentElement;
-  if (!container) return;
+      if (headerLine) {
+        const cleanHeader = headerLine
+          .replace('Task Note', '')
+          .replace(/\|/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
 
-  let fullText = container.innerText.replace('Notes', '').trim();
-  fullText = fullText.replace(/^[A-Za-z\s,]+\|\s*Task Note[^\n]*/i, '').trim();
-  fullText = fullText.replace(/^Notes\s*/i, '').trim();
+        const headerIndex = lines.indexOf(headerLine);
+        const bodyLines = [];
+        
+        for (let i = headerIndex + 1; i < lines.length; i++) {
+          let line = lines[i];
+          if (line.includes('Task Note') || line.includes('Task History')) {
+            break;
+          }
+          line = line.replace(/EditArchive/gi, '').trim();
+          if (line) {
+            bodyLines.push(line);
+          }
+        }
 
-  if (fullText && fullText.length > 5) {
-    saveCachedTaskNotes(taskId, fullText);
+        if (bodyLines.length > 0) {
+          const bodyText = bodyLines.join(' ');
+          latestNoteFormatted = `${cleanHeader} : ${bodyText}`;
+          break;
+        }
+      }
+    }
+  }
+
+  if (latestNoteFormatted && latestNoteFormatted.length > 3) {
+    saveCachedTaskNotes(taskId, latestNoteFormatted);
+    
+    const gridTaskId = sessionStorage.getItem('modmed_last_grid_task_id');
+    if (gridTaskId && gridTaskId !== taskId) {
+      saveCachedTaskNotes(gridTaskId, latestNoteFormatted);
+    }
   }
 }
 
@@ -88,8 +130,18 @@ function saveCachedTaskNotes(taskId, notes) {
     if (!snoozedTasks[taskId]) {
       snoozedTasks[taskId] = {};
     }
-    if (snoozedTasks[taskId].cachedNotes !== notes) {
+    
+    const timestamp = new Date().toLocaleString([], { 
+      month: '2-digit', 
+      day: '2-digit', 
+      year: 'numeric', 
+      hour: 'numeric', 
+      minute: '2-digit' 
+    });
+
+    if (snoozedTasks[taskId].cachedNotes !== notes || !snoozedTasks[taskId].lastChecked) {
       snoozedTasks[taskId].cachedNotes = notes;
+      snoozedTasks[taskId].lastChecked = timestamp;
       chrome.storage.local.set({ snoozedTasks });
     }
   });
@@ -102,19 +154,24 @@ document.addEventListener('mouseover', (e) => {
     return;
   }
   
-  const row = e.target.closest('table tbody tr');
-  if (!row) return;
+  chrome.storage.local.get(['extensionSettings'], (result) => {
+    const settings = result.extensionSettings || { masterEnable: true, featureHover: true };
+    if (!settings.masterEnable || !settings.featureHover) return;
 
-  if (window.currentHoveredRow === row) return;
-  window.currentHoveredRow = row;
+    const row = e.target.closest('table tbody tr');
+    if (!row) return;
 
-  const { taskId } = getTaskCellAndId(row);
-  if (!taskId) return;
+    if (window.currentHoveredRow === row) return;
+    window.currentHoveredRow = row;
 
-  chrome.storage.local.get(['snoozedTasks'], (result) => {
-    const snoozedTasks = result.snoozedTasks || {};
-    const snoozeData = snoozedTasks[taskId] || {};
-    showTaskTooltip(row, taskId, snoozeData);
+    const { taskId } = getTaskCellAndId(row);
+    if (!taskId) return;
+
+    chrome.storage.local.get(['snoozedTasks'], (res) => {
+      const snoozedTasks = res.snoozedTasks || {};
+      const snoozeData = snoozedTasks[taskId] || {};
+      showTaskTooltip(row, taskId, snoozeData);
+    });
   });
 });
 
@@ -130,7 +187,6 @@ window.addEventListener('hashchange', () => {
   window.currentHoveredRow = null;
   removeTaskTooltip();
   
-  // Restore active tab state when returning to the main grid from task details
   if (isTasksPage()) {
     setTimeout(() => {
       const activeTab = sessionStorage.getItem('modmed_active_task_tab');
@@ -151,21 +207,21 @@ document.addEventListener('click', () => {
   }
 });
 
-// Track task row clicks to remember context
+// Track task row clicks
 document.addEventListener('click', (e) => {
   const row = e.target.closest('table tbody tr');
   if (row) {
     const taskId = getTaskIdFromRow(row);
     if (taskId) {
       sessionStorage.setItem('modmed_last_clicked_task', taskId);
+      sessionStorage.setItem('modmed_last_grid_task_id', taskId);
     }
   }
 });
 
-// Inject Snooze button back to Task cell, and Label/Color picker into the Priority-adjacent column
+// Inject Snooze button and Color picker
 function injectTaskCustomColumns() {
   if (!isTasksPage()) return;
-  
   if (document.getElementById('active-snooze-popover') || document.querySelector('.modmed-color-palette-popup')) return;
 
   injectCustomColumnHeader();
@@ -183,12 +239,11 @@ function injectTaskCustomColumns() {
       const snoozeData = snoozedTasks[taskId] || {};
       const now = new Date().getTime();
       const isCurrentlySnoozed = snoozeData.snoozeUntil && new Date(snoozedTasks[taskId].snoozeUntil).getTime() > now;
-
-      // Apply saved row background color
       const activeColor = snoozeData.rowColor || '';
+
       applyRowColor(row, activeColor);
 
-      // --- A. INJECT SNOOZE BUTTON BACK UNDER THE TASK ID CELL ---
+      // --- A. INJECT SNOOZE BUTTON ---
       let existingWrapper = taskCell.querySelector('.modmed-snooze-wrapper-original');
       const currentLabelAttr = existingWrapper?.getAttribute('data-label') || '';
       const newLabelVal = snoozeData.label || '';
@@ -232,9 +287,8 @@ function injectTaskCustomColumns() {
         taskCell.appendChild(wrapper);
       }
 
-      // --- B. INJECT LABEL & COLOR SWATCH PICKER INTO COLUMN RIGHT AFTER PRIORITY ---
+      // --- B. INJECT LABEL & COLOR SWATCH PICKER ---
       let customCell = row.querySelector('.modmed-custom-cell');
-      
       const tds = Array.from(row.querySelectorAll('td'));
       const headerRow = document.querySelector('table thead tr');
       const ths = headerRow ? Array.from(headerRow.querySelectorAll('th')) : [];
@@ -243,7 +297,6 @@ function injectTaskCustomColumns() {
       if (!customCell) {
         customCell = document.createElement('td');
         customCell.className = 'modmed-custom-cell';
-        
         if (priorityThIndex !== -1 && tds[priorityThIndex]) {
           tds[priorityThIndex].insertAdjacentElement('afterend', customCell);
         } else {
@@ -298,26 +351,27 @@ function injectTaskCustomColumns() {
 // --- HOVER TOOLTIP PREVIEW HELPERS ---
 function showTaskTooltip(row, taskId, snoozeData) {
   removeTaskTooltip();
-
   if (!isTasksPage()) return;
 
   const notesText = snoozeData.cachedNotes ? snoozeData.cachedNotes : 'No notes viewed yet. Click into this task once to load its notes!';
+  const lastCheckedTime = snoozeData.lastChecked ? snoozeData.lastChecked : 'Never';
 
   const tooltip = document.createElement('div');
   tooltip.className = 'modmed-task-tooltip';
   
   const titleEl = document.createElement('div');
   titleEl.className = 'modmed-tooltip-title';
-  titleEl.innerText = `Task Notes: ${taskId}`;
+  titleEl.innerHTML = `<span style="font-weight: bold; display: block;">Most Recently Viewed Task Note</span> ${lastCheckedTime}`;
   tooltip.appendChild(titleEl);
 
   const contentEl = document.createElement('div');
+  contentEl.className = 'modmed-tooltip-content';
   contentEl.innerText = notesText;
   tooltip.appendChild(contentEl);
 
   if (snoozeData.label) {
     const labelEl = document.createElement('div');
-    labelEl.style.marginTop = '4px';
+    labelEl.style.marginTop = '6px';
     labelEl.style.color = '#38bdf8';
     labelEl.innerText = `Label: ${snoozeData.label}`;
     tooltip.appendChild(labelEl);
@@ -569,7 +623,7 @@ function removeSnoozeTask(taskId) {
   });
 }
 
-// 2. Inject Custom "Snoozed" Tab right after "All Tasks"
+// Inject Custom "Snoozed" Tab right after "All Tasks"
 function injectSnoozedTab() {
   if (!isTasksPage() || document.getElementById('snoozed-tab-btn')) return;
 
@@ -608,7 +662,6 @@ function injectSnoozedTab() {
     renderSnoozedView();
   });
 
-  // Track regular tab clicks to record active state
   Array.from(tabContainer.children).forEach(sibling => {
     if (sibling !== snoozedTabItem) {
       sibling.addEventListener('click', () => {
@@ -622,13 +675,12 @@ function injectSnoozedTab() {
 
   tabContainer.appendChild(snoozedTabItem);
 
-  // Restore snoozed tab state if it was active before opening task details
   if (sessionStorage.getItem('modmed_active_task_tab') === 'snoozed') {
     snoozedTabItem.click();
   }
 }
 
-// 3. Filter "Received" Tab (Hide active snoozed tasks)
+// Filter "Received" Tab
 function filterReceivedTasks() {
   if (!isTasksPage()) return;
   const isSnoozedActive = document.getElementById('snoozed-tab-btn')?.classList.contains('active');
@@ -657,7 +709,7 @@ function filterReceivedTasks() {
   });
 }
 
-// 4. Render "Snoozed" Tab
+// Render "Snoozed" Tab
 function renderSnoozedView() {
   if (!isTasksPage()) return;
   chrome.storage.local.get(['snoozedTasks'], (result) => {
@@ -693,25 +745,344 @@ function applyTaskFiltering() {
   }
 }
 
-// 5. Watch for SPA DOM Updates & Continually Scrape Notes
+// Watch for SPA DOM Updates & Continually Scrape Notes / Inject OTC Drawer
 let observerTimeout = null;
 const observer = new MutationObserver(() => {
   captureTaskNotesFromDetails();
 
-  if (!isTasksPage()) {
-    removeTaskTooltip();
-    return;
-  }
-  
-  if (document.getElementById('active-snooze-popover') || document.querySelector('.modmed-color-palette-popup')) return;
   if (observerTimeout) return;
   
   observerTimeout = setTimeout(() => {
     observerTimeout = null;
-    injectSnoozedTab();
-    injectTaskCustomColumns();
-    applyTaskFiltering();
-  }, 300);
+    
+    // 1. Task features (only run if on tasks page)
+    if (isTasksPage()) {
+      if (!document.getElementById('active-snooze-popover') && !document.querySelector('.modmed-color-palette-popup')) {
+        injectSnoozedTab();
+        injectTaskCustomColumns();
+        applyTaskFiltering();
+      }
+    }
+
+    // 2. Financial / Add Charge features (runs whenever the charge modal is opened)
+    injectDrawerTriggerButton();
+    injectDropdownShortcuts();
+
+  }, 350);
 });
 
 observer.observe(document.body, { childList: true, subtree: true });
+
+// --- OPTION 3: NATIVE DROPDOWN OTC SHORTCUTS (FROM TAMPERMONKEY) ---
+const otcShortcuts = [
+    { label: "⭐ Pedi C", code: "NOTCPediC", price: "75.00", desc: "Pedi-C" },
+    { label: "⭐ Pedi A", code: "NOTCPecliA", price: "54.00", desc: "Pedi-A" },
+    { label: "⭐ Tip (for Salon or Laser)", code: "NOTCTIP", price: "0.00", desc: "Tip" },
+    { label: "⭐ Laser Package (6)", code: "NC-NOTCLS6PKG", price: "745.00", desc: "6 Laser Package" },
+    { label: "⭐ Maintenance Laser Individual", code: "NC-NOTCLS50", price: "75.00", desc: "Maintenance Laser Individual" },
+    { label: "⭐ Individual Laser Treatment", code: "NC-NOTCLSIND", price: "155.00", desc: "Individual Laser Treatment" },
+    { label: "⭐ Selfpay Orthotic", code: "OTC-1258", price: "625.00", desc: "Selfpay Orthotic" },
+    { label: "⭐ 2nd Pair Orthotics", code: "OTC-1259", price: "415.00", desc: "2nd Pair Orthotics" },
+    { label: "⭐ Post-Op Kit", code: "OTC-0010", price: "19.50", desc: "Amerigel Post-Op" },
+    { label: "⭐ Clarus Antifungal Solution", code: "OTC-0071", price: "41.83", desc: "Clarus Antifungal Solution" },
+    { label: "⭐ Kera Nail Gel", code: "OTC-0216", price: "53.63", desc: "Kera Nail Gel" },
+    { label: "⭐ VerruStat", code: "OTC-0404", price: "34.27", desc: "VerruStat Liquid Wart Solution" },
+    { label: "⭐ Tolcylen Nail Solution", code: "OTC-0028", price: "75.00", desc: "Tolcylen Nail Solution" },
+    { label: "⭐ Tolcylen Soak (Large bag)", code: "OTC-0370", price: "97.60", desc: "Tolcylen Soak (Large bag)" },
+    { label: "⭐ Kera-42 Cream", code: "OTC-0390", price: "48.26", desc: "Kera-42 Cream" },
+    { label: "⭐ PRP Injection", code: "PRPINJ2", price: "950.00", desc: "PRP Injection" },
+    { label: "⭐ Post Op Shoe", code: "OTC-0302", price: "30.00", desc: "Post Op Shoe" }
+    // (Add any other short items you want here)
+];
+
+function isProductSelector(selectElem) {
+    if (!selectElem) return false;
+    if (selectElem.closest('mmpm-charge-product-selector')) return true;
+    const parentContainer = selectElem.parentElement || selectElem.closest('.form-group, td, th, div');
+    if (parentContainer) {
+        const labelText = parentContainer.innerText || '';
+        if (labelText.includes('Product') || labelText.includes('Charge') || labelText.includes('Code')) {
+            return true;
+        }
+    }
+    const input = selectElem.querySelector('input');
+    if (input) {
+        const attr = (input.getAttribute('formcontrolname') || input.getAttribute('data-identifier') || '').toLowerCase();
+        if (attr.includes('product') || attr.includes('charge') || attr.includes('code')) return true;
+    }
+    return false;
+}
+
+function injectDropdownShortcuts() {
+    const panel = document.querySelector('ng-dropdown-panel');
+    if (!panel || panel.dataset.shortcutsAdded) return;
+    
+    const activeSelect = document.querySelector('ng-select.ng-select-opened');
+    if (!activeSelect || !isProductSelector(activeSelect)) return;
+    
+    const currentRow = activeSelect.closest('tr') || activeSelect.closest('.ema-form-row') || activeSelect.closest('.charge-row');
+    const scrollHost = panel.querySelector('.scroll-host');
+    if (!scrollHost) return;
+
+    scrollHost.style.maxHeight = '120px';
+    scrollHost.style.overflowY = 'auto';
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'max-height: 250px; overflow-y: auto; border-bottom: 1px solid #ccc; background: transparent;';
+    
+    const header = document.createElement('div');
+    header.className = 'ng-option-disabled ng-optgroup';
+    header.style.cssText = 'color: rgb(80, 45, 127); font-weight: 700; padding: 8px 10px; font-size: 13px; cursor: default; user-select: none;';
+    header.innerText = 'OTC Shortcuts';
+    wrapper.appendChild(header);
+
+    otcShortcuts.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'ng-option custom-shortcut-option';
+        div.style.cssText = 'border-bottom: 1px solid #f0f0f0; cursor: pointer; padding: 8px 12px; font-size: 13px;';
+        div.innerHTML = `<span style="font-weight: 500; color: #1565c0;">${item.label}</span>`;
+        
+        div.onmousedown = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const input = activeSelect.querySelector('input[type="text"]');
+            if (input) {
+                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                nativeInputValueSetter.call(input, item.code);
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+
+                const startTime = Date.now();
+                const maxWait = 2000;
+                const attemptSelection = () => {
+                    const options = Array.from(scrollHost.querySelectorAll('.ng-option:not(.custom-shortcut-option)'));
+                    const target = options.find(opt => opt.innerText.trim().includes(item.code) || opt.innerText.trim().includes(item.desc));
+                    if (target) {
+                        target.click();
+                        setTimeout(() => {
+                            if (currentRow) {
+                                updateInputInRow(currentRow, 'description', item.desc);
+                                updateInputInRow(currentRow, 'actual-amount', item.price);
+                                updateInputInRow(currentRow, 'original-amount', item.price);
+                                updateInputInRow(currentRow, 'unit-charge', item.price);
+                            }
+                        }, 100);
+                    } else if (Date.now() - startTime < maxWait) {
+                        setTimeout(attemptSelection, 50);
+                    } else {
+                        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true }));
+                    }
+                };
+                attemptSelection();
+            }
+        };
+        wrapper.appendChild(div);
+    });
+
+    panel.insertBefore(wrapper, scrollHost);
+    panel.dataset.shortcutsAdded = "true";
+}
+
+function updateInputInRow(rowElement, identifier, val) {
+    if (!val || !rowElement) return;
+    const el = rowElement.querySelector(`input[data-identifier="${identifier}"], input[formcontrolname="${identifier}"], input[name*="${identifier}"]`);
+    if (el) {
+        const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+        nativeSetter.call(el, val);
+        ['input', 'change', 'blur'].forEach(ev => el.dispatchEvent(new Event(ev, { bubbles: true })));
+    }
+}
+
+// --- OPTION 2: SIDE DRAWER OTC QUICK-PICKER ---
+
+// Define your structured OTC list with categories
+const otcCategories = [
+  {
+    category: "Injections & Procedures",
+    items: [
+      { label: "PRP Injection", code: "PRPINJ2", price: "950.00", desc: "PRP Injection" },
+      { label: "Pedi C", code: "NOTCPediC", price: "75.00", desc: "Pedi-C" },
+      { label: "Pedi A", code: "NOTCPecliA", price: "54.00", desc: "Pedi-A" }
+    ]
+  },
+  {
+    category: "Laser Treatments",
+    items: [
+      { label: "Laser Package (6)", code: "NC-NOTCLS6PKG", price: "745.00", desc: "6 Laser Package" },
+      { label: "Maintenance Laser Individual", code: "NC-NOTCLS50", price: "75.00", desc: "Maintenance Laser Individual" },
+      { label: "Individual Laser Treatment", code: "NC-NOTCLSIND", price: "155.00", desc: "Individual Laser Treatment" },
+      { label: "Tip (for Salon or Laser)", code: "NOTCTIP", desc: "Tip" }
+    ]
+  },
+  {
+    category: "Orthotics & Braces",
+    items: [
+      { label: "Selfpay Orthotic", code: "OTC-1258", price: "625.00", desc: "Selfpay Orthotic" },
+      { label: "2nd Pair Orthotics", code: "OTC-1259", price: "415.00", desc: "2nd Pair Orthotics" },
+      { label: "Redi-Thotics Comfort", code: "OTC-0282", price: "56.84", desc: "Redi-Thotics Comfort" },
+      { label: "Post Op Shoe", code: "OTC-0302", price: "30.00", desc: "Post Op Shoe" }
+    ]
+  },
+  {
+    category: "Solutions & Creams",
+    items: [
+      { label: "Tolcylen Nail Solution", code: "OTC-0028", price: "75.00", desc: "Tolcylen Nail Solution" },
+      { label: "Tolcylen Soak (Large bag)", code: "OTC-0370", price: "97.60", desc: "Tolcylen Soak (Large bag)" },
+      { label: "Kera Nail Gel", code: "OTC-0216", price: "53.63", desc: "Kera Nail Gel" },
+      { label: "Kera-42 Cream", code: "OTC-0390", price: "48.26", desc: "Kera-42 Cream" }
+    ]
+  }
+];
+
+function injectDrawerTriggerButton() {
+  // Target the product search input or wrapper inside the active charge row/modal
+  const productInput = document.querySelector('input[aria-label*="Product"], ng-select input[type="text"], input[placeholder*="Search"]');
+  if (!productInput || document.getElementById('danmed-launch-drawer')) return;
+
+  const targetContainer = productInput.closest('td') || productInput.parentElement;
+  if (!targetContainer) return;
+
+  // Create trigger button
+  const triggerBtn = document.createElement('button');
+  triggerBtn.id = 'danmed-launch-drawer';
+  triggerBtn.className = 'danmed-open-drawer-btn';
+  triggerBtn.type = 'button';
+  triggerBtn.innerHTML = '⚡ OTC Quick Catalog';
+  
+  triggerBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleOtcDrawer(true);
+  });
+
+  // Ensure container is flex and inject the button cleanly next to the input
+  targetContainer.style.display = 'flex';
+  targetContainer.style.alignItems = 'center';
+  targetContainer.style.gap = '6px';
+  targetContainer.appendChild(triggerBtn);
+}
+}
+
+function toggleOtcDrawer(open) {
+  let drawer = document.getElementById('danmed-otc-drawer');
+  if (!drawer && open) {
+    drawer = createOtcDrawer();
+    document.body.appendChild(drawer);
+  }
+  if (drawer) {
+    if (open) {
+      drawer.classList.add('open');
+    } else {
+      drawer.classList.remove('open');
+    }
+  }
+}
+
+function createOtcDrawer() {
+  const drawer = document.createElement('div');
+  drawer.id = 'danmed-otc-drawer';
+  drawer.className = 'danmed-otc-drawer';
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'danmed-otc-header';
+  header.innerHTML = `<span>⚡ OTC Catalog Quick-Picker</span>`;
+  
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'danmed-otc-close';
+  closeBtn.innerHTML = '&times;';
+  closeBtn.onclick = () => toggleOtcDrawer(false);
+  header.appendChild(closeBtn);
+  drawer.appendChild(header);
+
+  // Search Bar
+  const searchBox = document.createElement('div');
+  searchBox.className = 'danmed-otc-search-box';
+  const searchInput = document.createElement('input');
+  searchInput.className = 'danmed-otc-search-input';
+  searchInput.type = 'text';
+  searchInput.placeholder = 'Search items by name or code...';
+  searchBox.appendChild(searchInput);
+  drawer.appendChild(searchBox);
+
+  // Body Content Container
+  const body = document.createElement('div');
+  body.className = 'danmed-otc-body';
+  drawer.appendChild(body);
+
+  const renderItems = (filterText = '') => {
+    body.innerHTML = '';
+    const query = filterText.toLowerCase();
+
+    otcCategories.forEach(cat => {
+      const filteredItems = cat.items.filter(item => 
+        item.label.toLowerCase().includes(query) || 
+        item.code.toLowerCase().includes(query) || 
+        item.desc.toLowerCase().includes(query)
+      );
+
+      if (filteredItems.length === 0) return;
+
+      const catTitle = document.createElement('div');
+      catTitle.className = 'danmed-otc-category-title';
+      catTitle.innerText = cat.category;
+      body.appendChild(catTitle);
+
+      filteredItems.forEach(item => {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'danmed-otc-item';
+        itemEl.innerHTML = `
+          <span class="danmed-otc-item-label">${item.label}</span>
+          <span class="danmed-otc-item-price">$${item.price || '0.00'}</span>
+        `;
+
+        itemEl.onclick = () => {
+          selectOtcItem(item);
+          toggleOtcDrawer(false);
+        };
+
+        body.appendChild(itemEl);
+      });
+    });
+  };
+
+  searchInput.oninput = (e) => renderItems(e.target.value);
+  renderItems();
+
+  return drawer;
+}
+
+function selectOtcItem(item) {
+  // Target the currently active product search input in ModMed
+  const activeSelect = document.querySelector('ng-select.ng-select-opened, ng-select');
+  if (!activeSelect) return;
+
+  const input = activeSelect.querySelector('input[type="text"]');
+  const currentRow = activeSelect.closest('tr') || activeSelect.closest('.ema-form-row') || activeSelect.closest('.charge-row');
+
+  if (input) {
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+    nativeInputValueSetter.call(input, item.code);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+
+    // Simulate clicking the matching dropdown result
+    setTimeout(() => {
+      const panel = document.querySelector('ng-dropdown-panel');
+      if (panel) {
+        const options = Array.from(panel.querySelectorAll('.ng-option'));
+        const target = options.find(opt => opt.innerText.trim().includes(item.code) || opt.innerText.trim().includes(item.desc));
+        if (target) {
+          target.click();
+        }
+      }
+
+      // Auto-populate price and description fields in the active row
+      if (currentRow) {
+        updateInputInRow(currentRow, 'description', item.desc);
+        updateInputInRow(currentRow, 'actual-amount', item.price);
+        updateInputInRow(currentRow, 'original-amount', item.price);
+        updateInputInRow(currentRow, 'unit-charge', item.price);
+      }
+    }, 200);
+  }
+}
