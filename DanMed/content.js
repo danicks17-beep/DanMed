@@ -21,6 +21,89 @@ function DanMedFeatureEnabled(feature) {
   return danmedSettings.masterEnable !== false && danmedSettings[feature] !== false;
 }
 window.DanMedFeatureEnabled = DanMedFeatureEnabled;
+
+const danmedOriginalDocumentTitle = document.title;
+let danmedLastRouteTitle = '';
+
+function getDanMedStaffRoute() {
+  const hash = window.location.hash || '';
+  const route = hash.split('?')[0].replace(/^#\/?/, '/');
+  return route.replace(/^\/practice\/staff\/?/, '/').replace(/\/$/, '') || '/';
+}
+
+function getVisiblePatientName() {
+  const candidates = Array.from(document.querySelectorAll('a, h1, h2, h3, h4, [role="heading"]'))
+    .map(el => (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim())
+    .filter(text => text && text.length <= 100 && text.split(',').length === 2);
+  return candidates.find(text => {
+    const parts = text.split(',').map(part => part.trim());
+    return parts[0] && parts[1] && !/^(home|schedule|patients|tasks|orders|notes|manage)$/i.test(parts[0]);
+  }) || '';
+}
+
+function updateDanMedDocumentTitle() {
+  const route = getDanMedStaffRoute();
+  let title = '';
+  if (route === '/master-checkin/home/masterCheckinView') {
+    title = 'Appt Flow';
+  } else if (route.startsWith('/patient/') && route.includes('/chart/')) {
+    const patientName = getVisiblePatientName();
+    title = patientName || 'Patient Chart';
+  } else if (route.startsWith('/tasks/task-details/')) {
+    const patientName = getVisiblePatientName();
+    title = patientName ? `Task Details: ${patientName}` : 'Task Details';
+  } else if (route.startsWith('/tasks/manage/')) {
+    title = 'Tasks';
+  } else if (route === '/scheduler') {
+    title = 'Schedule';
+  } else {
+    title = danmedOriginalDocumentTitle;
+  }
+  if (title && document.title !== title) document.title = title;
+  danmedLastRouteTitle = `${route}|${title}`;
+}
+
+function setNativeSelectValue(select, value) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+  if (setter) setter.call(select, value);
+  else select.value = value;
+  ['input', 'change'].forEach(type => select.dispatchEvent(new Event(type, { bubbles: true })));
+}
+
+function setTasksRecordsPerPage() {
+  const route = getDanMedStaffRoute();
+  if (!route.startsWith('/tasks/manage/')) return;
+  const selects = Array.from(document.querySelectorAll('select')).filter(select => {
+    const options = Array.from(select.options || []).map(option => option.text.trim());
+    const context = (select.closest('label, .form-group, td, div')?.innerText || '').replace(/\s+/g, ' ');
+    return options.includes('100') && options.includes('10') && /View Records By/i.test(context);
+  });
+  selects.forEach(select => {
+    if (select.value !== '100' && select.value !== 100) setNativeSelectValue(select, '100');
+  });
+
+  // Fallback for an ng-select implementation if the application replaces the native control.
+  const recordLabel = Array.from(document.querySelectorAll('label, span, div')).find(el =>
+    /View Records By/i.test((el.innerText || '').replace(/\s+/g, ' ')) && el.querySelector('ng-select')
+  );
+  const ngSelect = recordLabel?.querySelector('ng-select');
+  if (ngSelect && !/\b100\b/.test(ngSelect.innerText || '')) {
+    ngSelect.querySelector('.ng-select-container')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    ngSelect.querySelector('.ng-select-container')?.click();
+    setTimeout(() => {
+      const option = Array.from(document.querySelectorAll('ng-dropdown-panel .ng-option'))
+        .find(el => (el.innerText || '').trim() === '100');
+      option?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+      option?.click();
+    }, 50);
+  }
+}
+
+function applyDanMedRouteEnhancements() {
+  updateDanMedDocumentTitle();
+  setTasksRecordsPerPage();
+}
+
 function cleanupDanMedFeatureDom() {
   document.querySelectorAll('.custom-location-shortcuts, .custom-staff-shortcuts, #payer-shortcuts-container, .custom-shortcut-item, .custom-shortcut-option, .custom-provider-shortcuts, .modmed-task-tooltip').forEach(el => el.remove());
   document.querySelectorAll('ng-dropdown-panel[data-shortcuts-added]').forEach(panel => {
@@ -223,6 +306,7 @@ document.addEventListener('mouseout', (e) => {
 });
 
 window.addEventListener('hashchange', () => {
+  applyDanMedRouteEnhancements();
   window.currentHoveredRow = null;
   removeTaskTooltip();
   
@@ -787,6 +871,7 @@ function applyTaskFiltering() {
 // Watch for SPA DOM Updates & Continually Scrape Notes
 let observerTimeout = null;
 const observer = new MutationObserver(() => {
+  applyDanMedRouteEnhancements();
   if (!DanMedFeatureEnabled('featureTaskTools')) return;
   captureTaskNotesFromDetails();
 
@@ -807,3 +892,5 @@ const observer = new MutationObserver(() => {
 });
 
 observer.observe(document.body, { childList: true, subtree: true });
+applyDanMedRouteEnhancements();
+setInterval(applyDanMedRouteEnhancements, 750);
