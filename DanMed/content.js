@@ -96,13 +96,16 @@ function setNativeSelectValue(select, value) {
   ['input', 'change'].forEach(type => select.dispatchEvent(new Event(type, { bubbles: true })));
 }
 
-function setTasksRecordsPerPage() {
+function setRecordsPerPage100() {
   const route = getDanMedStaffRoute();
-  if (!route.startsWith('/tasks/manage/')) return;
+  const isTasksManagement = route.startsWith('/tasks/manage/');
+  const isFaxesManagement = route.startsWith('/faxes/manage/');
+  if (!isTasksManagement && !isFaxesManagement) return;
   const selects = Array.from(document.querySelectorAll('select')).filter(select => {
     const options = Array.from(select.options || []).map(option => option.text.trim());
     const context = (select.closest('label, .form-group, td, div')?.innerText || '').replace(/\s+/g, ' ');
-    return options.includes('100') && options.includes('10') && /View Records By/i.test(context);
+    return options.includes('100') && /View Records By/i.test(context) &&
+      (isTasksManagement ? options.includes('10') : options.includes('25'));
   });
   selects.forEach(select => {
     if (select.value !== '100' && select.value !== 100) setNativeSelectValue(select, '100');
@@ -127,7 +130,7 @@ function setTasksRecordsPerPage() {
 
 function applyDanMedRouteEnhancements() {
   updateDanMedDocumentTitle();
-  setTasksRecordsPerPage();
+  setRecordsPerPage100();
 }
 
 function cleanupDanMedFeatureDom() {
