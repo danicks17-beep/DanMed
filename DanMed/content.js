@@ -61,22 +61,22 @@ function updateDanMedDocumentTitle() {
     title = patientName ? `Check Out: ${patientName}` : 'Check Out';
   } else if (route.startsWith('/patient/') && route.includes('/edit-patient/financials/')) {
     const patientName = getVisiblePatientName();
-    title = patientName ? `${patientName}: Financials` : 'Financials';
+    title = patientName ? `Financials: ${patientName}` : 'Financials';
   } else if (route.startsWith('/patient/') && route.includes('/edit-patient/contact-info')) {
     const patientName = getVisiblePatientName();
-    title = patientName ? `${patientName}: Contact Info` : 'Contact Info';
+    title = patientName ? `Demos: ${patientName}` : 'Contact Info';
   } else if (route.startsWith('/patient/') && route.includes('/chart/tasks')) {
     const patientName = getVisiblePatientName();
-    title = patientName ? `${patientName}: Tasks` : 'Tasks';
+    title = patientName ? `Tasks: ${patientName}` : 'Tasks';
   } else if (route.startsWith('/patient/') && route.includes('/edit-patient/patient-insurance/')) {
     const patientName = getVisiblePatientName();
-    title = patientName ? `${patientName}: Insurance` : 'Insurance';
+    title = patientName ? `Insurance: ${patientName}` : 'Insurance';
   } else if (route.startsWith('/patient/') && route.includes('/chart/')) {
     const patientName = getVisiblePatientName();
     title = patientName || 'Patient Chart';
   } else if (route.startsWith('/tasks/task-details/')) {
     const patientName = getVisiblePatientName();
-    title = patientName ? `Task Details: ${patientName}` : 'Task Details';
+    title = patientName ? `Task: ${patientName}` : 'Task Details';
   } else if (route.startsWith('/tasks/manage/')) {
     title = 'Tasks';
   } else if (route === '/scheduler') {
