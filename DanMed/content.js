@@ -59,6 +59,18 @@ function updateDanMedDocumentTitle() {
   } else if (route.startsWith('/master-checkin/checkOut/')) {
     const patientName = getVisiblePatientName();
     title = patientName ? `Check Out: ${patientName}` : 'Check Out';
+  } else if (route.startsWith('/patient/') && route.includes('/edit-patient/financials/')) {
+    const patientName = getVisiblePatientName();
+    title = patientName ? `${patientName}: Financials` : 'Financials';
+  } else if (route.startsWith('/patient/') && route.includes('/edit-patient/contact-info')) {
+    const patientName = getVisiblePatientName();
+    title = patientName ? `${patientName}: Contact Info` : 'Contact Info';
+  } else if (route.startsWith('/patient/') && route.includes('/chart/tasks')) {
+    const patientName = getVisiblePatientName();
+    title = patientName ? `${patientName}: Tasks` : 'Tasks';
+  } else if (route.startsWith('/patient/') && route.includes('/edit-patient/patient-insurance/')) {
+    const patientName = getVisiblePatientName();
+    title = patientName ? `${patientName}: Insurance` : 'Insurance';
   } else if (route.startsWith('/patient/') && route.includes('/chart/')) {
     const patientName = getVisiblePatientName();
     title = patientName || 'Patient Chart';
