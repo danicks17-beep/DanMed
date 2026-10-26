@@ -41,11 +41,24 @@ function getVisiblePatientName() {
   }) || '';
 }
 
+function getCheckInPatientName() {
+  const patientName = getVisiblePatientName();
+  // The Check In header includes a middle initial for some patients; keep the
+  // requested concise format for that route while preserving full names on Check Out.
+  return patientName.replace(/,\s+([^,]+)\s+[A-Z]\.$/, ', $1');
+}
+
 function updateDanMedDocumentTitle() {
   const route = getDanMedStaffRoute();
   let title = '';
   if (route === '/master-checkin/home/masterCheckinView') {
     title = 'Appt Flow';
+  } else if (route.startsWith('/master-checkin/checkIn/')) {
+    const patientName = getCheckInPatientName();
+    title = patientName ? `Check In: ${patientName}` : 'Check In';
+  } else if (route.startsWith('/master-checkin/checkOut/')) {
+    const patientName = getVisiblePatientName();
+    title = patientName ? `Check Out: ${patientName}` : 'Check Out';
   } else if (route.startsWith('/patient/') && route.includes('/chart/')) {
     const patientName = getVisiblePatientName();
     title = patientName || 'Patient Chart';
