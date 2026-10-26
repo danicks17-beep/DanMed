@@ -10,7 +10,8 @@ const DEFAULT_SETTINGS = {
   payerShortcuts: true,
   faxOptionRenaming: true,
   otcChargeShortcuts: true,
-  selfPayOverrides: true
+  selfPayOverrides: true,
+  attachmentDocumentShortcuts: true
 };
 
 document.addEventListener('DOMContentLoaded', () => {

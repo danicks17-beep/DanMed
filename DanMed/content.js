@@ -11,7 +11,8 @@ const DANMED_DEFAULT_SETTINGS = {
   payerShortcuts: true,
   faxOptionRenaming: true,
   otcChargeShortcuts: true,
-  selfPayOverrides: true
+  selfPayOverrides: true,
+  attachmentDocumentShortcuts: true
 };
 let danmedSettings = { ...DANMED_DEFAULT_SETTINGS };
 chrome.storage.local.get(['extensionSettings'], (result) => {
@@ -130,7 +131,7 @@ function applyDanMedRouteEnhancements() {
 }
 
 function cleanupDanMedFeatureDom() {
-  document.querySelectorAll('.custom-location-shortcuts, .custom-staff-shortcuts, #payer-shortcuts-container, .custom-shortcut-item, .custom-shortcut-option, .custom-provider-shortcuts, .modmed-task-tooltip').forEach(el => el.remove());
+  document.querySelectorAll('.custom-location-shortcuts, .custom-staff-shortcuts, #payer-shortcuts-container, .custom-shortcut-item, .custom-shortcut-option, .custom-provider-shortcuts, .danmed-attachment-shortcut, .modmed-task-tooltip').forEach(el => el.remove());
   document.querySelectorAll('ng-dropdown-panel[data-shortcuts-added]').forEach(panel => {
     panel.querySelector('.custom-shortcut-option')?.parentElement?.remove();
     delete panel.dataset.shortcutsAdded;

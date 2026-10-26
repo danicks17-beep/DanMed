@@ -1624,3 +1624,89 @@
     }, 500);
 })();
 
+
+/* Imported from the attached TamperMonkey script; adapted for DanMed. */
+(function initAttachmentDocumentShortcuts() {
+    'use strict';
+
+    const SHORTCUTS = [
+        { id: 'l3000-btn', label: 'L3000', title: 'L3000 Proof of Delivery', category: 'DME' },
+        { id: 'vasc-btn', label: 'Vascular', title: 'Vascular Referral', category: 'Clinical Document' }
+    ];
+
+    function setInputValue(input, value) {
+        const setter = Object.getOwnPropertyDescriptor(
+            Object.getPrototypeOf(input),
+            'value'
+        )?.set || Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+        if (setter) setter.call(input, value);
+        else input.value = value;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function selectCategory(category) {
+        const categorySelect = document.querySelector('[data-identifier="file-attachment-category-select"]');
+        const categoryInput = categorySelect?.querySelector('input');
+        if (!categoryInput) return;
+
+        categoryInput.focus();
+        setInputValue(categoryInput, category);
+        setTimeout(() => {
+            if (!window.DanMedFeatureEnabled('attachmentDocumentShortcuts')) return;
+            const option = Array.from(document.querySelectorAll(
+                'ng-dropdown-panel .ng-option, .ui-select-choices-row, [role="option"]'
+            )).find(el => (el.innerText || el.textContent || '').trim() === category);
+            if (option) {
+                option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                option.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                option.click();
+            } else {
+                categoryInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', keyCode: 40, bubbles: true }));
+                categoryInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true }));
+            }
+            setTimeout(() => categoryInput.blur(), 100);
+        }, 800);
+    }
+
+    function applyShortcut(shortcut) {
+        if (!window.DanMedFeatureEnabled('attachmentDocumentShortcuts')) return;
+        const titleInput = document.querySelector('input#fileAttachmentTitle');
+        if (!titleInput) return;
+        setInputValue(titleInput, shortcut.title);
+        selectCategory(shortcut.category);
+    }
+
+    function removeShortcutButtons() {
+        SHORTCUTS.forEach(shortcut => document.getElementById(shortcut.id)?.remove());
+    }
+
+    function init() {
+        if (!window.DanMedFeatureEnabled('attachmentDocumentShortcuts')) {
+            removeShortcutButtons();
+            return;
+        }
+        const titleInput = document.querySelector('input#fileAttachmentTitle');
+        if (!titleInput) return;
+        SHORTCUTS.forEach(shortcut => {
+            if (document.getElementById(shortcut.id)) return;
+            const button = document.createElement('button');
+            button.id = shortcut.id;
+            button.textContent = shortcut.label;
+            button.type = 'button';
+            button.className = 'btn btn-info btn-xs danmed-attachment-shortcut';
+            button.style.marginTop = '4px';
+            button.style.display = 'block';
+            button.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                applyShortcut(shortcut);
+            });
+            titleInput.after(button);
+        });
+    }
+
+    const observer = new MutationObserver(init);
+    if (document.body) observer.observe(document.body, { childList: true, subtree: true });
+    init();
+})();
