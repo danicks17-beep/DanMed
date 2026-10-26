@@ -1,32 +1,32 @@
+const DEFAULT_SETTINGS = {
+  masterEnable: true,
+  featureTaskTools: true,
+  featureHover: true,
+  appointmentHighlighting: true,
+  locationShortcuts: true,
+  taskStaffShortcuts: true,
+  staffShortcuts: true,
+  providerShortcuts: true,
+  payerShortcuts: true,
+  faxOptionRenaming: true,
+  otcChargeShortcuts: true,
+  selfPayOverrides: true
+};
+
 document.addEventListener('DOMContentLoaded', () => {
-  const masterEnable = document.getElementById('masterEnable');
-  const featureHover = document.getElementById('featureHover');
-
-  const toggles = [masterEnable, featureHover];
-
-  // Load saved states from storage
-  chrome.storage.local.get(['extensionSettings'], (result) => {
-    const settings = result.extensionSettings || {
-      masterEnable: true,
-      featureHover: true
-    };
-
-    masterEnable.checked = settings.masterEnable;
-    featureHover.checked = settings.featureHover;
+  const ids = Object.keys(DEFAULT_SETTINGS);
+  const controls = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+  chrome.storage.local.get(['extensionSettings'], ({ extensionSettings }) => {
+    const settings = { ...DEFAULT_SETTINGS, ...(extensionSettings || {}) };
+    ids.forEach(id => { if (controls[id]) controls[id].checked = settings[id] !== false; });
   });
-
-  // Listen for changes and save to storage
-  toggles.forEach(toggle => {
-    toggle.addEventListener('change', () => {
-      const settings = {
-        masterEnable: masterEnable.checked,
-        featureHover: featureHover.checked
-      };
-
+  ids.forEach(id => {
+    controls[id]?.addEventListener('change', () => {
+      const settings = Object.fromEntries(ids.map(key => [key, controls[key].checked]));
       chrome.storage.local.set({ extensionSettings: settings }, () => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
           if (tabs[0]?.id) {
-            chrome.tabs.sendMessage(tabs[0].id, { type: 'SETTINGS_UPDATED', settings });
+            try { chrome.tabs.sendMessage(tabs[0].id, { type: 'SETTINGS_UPDATED', settings }); } catch (_) { /* The active tab may not host DanMed. */ }
           }
         });
       });

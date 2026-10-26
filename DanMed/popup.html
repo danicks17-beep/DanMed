@@ -3,99 +3,37 @@
 <head>
   <meta charset="utf-8">
   <style>
-    body {
-      width: 240px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      margin: 0;
-      padding: 12px;
-      background: #f8fafc;
-      color: #1e293b;
-    }
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid #e2e8f0;
-      padding-bottom: 8px;
-      margin-bottom: 10px;
-    }
-    .title {
-      font-weight: bold;
-      font-size: 14px;
-      color: #0f172a;
-    }
-    .switch-container {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 8px;
-      font-size: 12px;
-      background: #ffffff;
-      padding: 8px;
-      border-radius: 6px;
-      border: 1px solid #e2e8f0;
-    }
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 34px;
-      height: 20px;
-    }
-    .switch input { 
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-color: #cbd5e1;
-      transition: .2s;
-      border-radius: 20px;
-    }
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 14px;
-      width: 14px;
-      left: 3px;
-      bottom: 3px;
-      background-color: white;
-      transition: .2s;
-      border-radius: 50%;
-    }
-    input:checked + .slider {
-      background-color: #2563eb;
-    }
-    input:checked + .slider:before {
-      transform: translateX(14px);
-    }
+    body { width: 320px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 12px; background: #f8fafc; color: #1e293b; }
+    .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 10px; }
+    .title { font-weight: 700; font-size: 14px; color: #0f172a; }
+    .section { margin: 10px 0 6px; color: #64748b; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+    .switch-container { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 12px; background: #fff; padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0; }
+    .master { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; font-weight: 700; }
+    .switch { position: relative; display: inline-block; width: 34px; height: 20px; flex: 0 0 auto; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; inset: 0; background: #cbd5e1; transition: .2s; border-radius: 20px; }
+    .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background: #fff; transition: .2s; border-radius: 50%; }
+    input:checked + .slider { background: #2563eb; }
+    input:checked + .slider:before { transform: translateX(14px); }
   </style>
 </head>
 <body>
-  <div class="header">
-    <span class="title">DanMed Controls</span>
-  </div>
-
-  <!-- Master Enable / Disable Switch -->
-  <div class="switch-container" style="background: #eff6ff; border-color: #bfdbfe;">
-    <span style="font-weight: bold; color: #1d4ed8;">Extension Enabled</span>
-    <label class="switch">
-      <input type="checkbox" id="masterEnable" checked>
-      <span class="slider"></span>
-    </label>
-  </div>
-
-  <!-- Feature: Hover Previews -->
-  <div class="switch-container">
-    <span> Note Hover Previews</span>
-    <label class="switch">
-      <input type="checkbox" id="featureHover" checked>
-      <span class="slider"></span>
-    </label>
-  </div>
-
+  <div class="header"><span class="title">DanMed Controls</span></div>
+  <div class="switch-container master"><span>Extension Enabled</span><label class="switch"><input type="checkbox" id="masterEnable"><span class="slider"></span></label></div>
+  <div class="section">Task management</div>
+  <div class="switch-container"><span>Task Snoozing, Labels &amp; Colors</span><label class="switch"><input type="checkbox" id="featureTaskTools"><span class="slider"></span></label></div>
+  <div class="switch-container"><span>Note Hover Previews</span><label class="switch"><input type="checkbox" id="featureHover"><span class="slider"></span></label></div>
+  <div class="section">ModMed shortcuts</div>
+  <div class="switch-container"><span>OTC Charge Shortcuts</span><label class="switch"><input type="checkbox" id="otcChargeShortcuts"><span class="slider"></span></label></div>
+  <div class="switch-container"><span>Insurance Payer Shortcuts</span><label class="switch"><input type="checkbox" id="payerShortcuts"><span class="slider"></span></label></div>
+  <div class="switch-container"><span>Location Shortcuts</span><label class="switch"><input type="checkbox" id="locationShortcuts"><span class="slider"></span></label></div>
+  <div class="switch-container"><span>Task Staff Shortcuts</span><label class="switch"><input type="checkbox" id="taskStaffShortcuts"><span class="slider"></span></label></div>
+  <div class="switch-container"><span>Staff Shortcuts</span><label class="switch"><input type="checkbox" id="staffShortcuts"><span class="slider"></span></label></div>
+  <div class="switch-container"><span>Provider Shortcuts</span><label class="switch"><input type="checkbox" id="providerShortcuts"><span class="slider"></span></label></div>
+  <div class="switch-container"><span>Fax Option Renaming</span><label class="switch"><input type="checkbox" id="faxOptionRenaming"><span class="slider"></span></label></div>
+  <div class="section">Billing &amp; display automation</div>
+  <div class="switch-container"><span>Appointment Highlighting</span><label class="switch"><input type="checkbox" id="appointmentHighlighting"><span class="slider"></span></label></div>
+  <div class="switch-container"><span>Self-Pay Charge Overrides</span><label class="switch"><input type="checkbox" id="selfPayOverrides"><span class="slider"></span></label></div>
   <script src="popup.js"></script>
 </body>
 </html>

@@ -1,3 +1,37 @@
+// DanMed feature settings are shared by the popup and every content feature.
+const DANMED_DEFAULT_SETTINGS = {
+  masterEnable: true,
+  featureTaskTools: true,
+  featureHover: true,
+  appointmentHighlighting: true,
+  locationShortcuts: true,
+  taskStaffShortcuts: true,
+  staffShortcuts: true,
+  providerShortcuts: true,
+  payerShortcuts: true,
+  faxOptionRenaming: true,
+  otcChargeShortcuts: true,
+  selfPayOverrides: true
+};
+let danmedSettings = { ...DANMED_DEFAULT_SETTINGS };
+chrome.storage.local.get(['extensionSettings'], (result) => {
+  danmedSettings = { ...DANMED_DEFAULT_SETTINGS, ...(result.extensionSettings || {}) };
+});
+function DanMedFeatureEnabled(feature) {
+  return danmedSettings.masterEnable !== false && danmedSettings[feature] !== false;
+}
+window.DanMedFeatureEnabled = DanMedFeatureEnabled;
+function cleanupDanMedFeatureDom() {
+  document.querySelectorAll('.custom-location-shortcuts, .custom-staff-shortcuts, #payer-shortcuts-container, .custom-shortcut-item, .custom-shortcut-option, .custom-provider-shortcuts, .modmed-task-tooltip').forEach(el => el.remove());
+  document.querySelectorAll('ng-dropdown-panel[data-shortcuts-added]').forEach(panel => {
+    panel.querySelector('.custom-shortcut-option')?.parentElement?.remove();
+    delete panel.dataset.shortcutsAdded;
+  });
+  document.querySelectorAll('[data-shortcuts-added]').forEach(el => delete el.dataset.shortcutsAdded);
+  document.querySelectorAll('.col-md-8.appt-row-center').forEach(el => {
+    if (el.style.backgroundColor === 'rgb(230, 231, 255)' || el.style.backgroundColor === 'rgb(252, 241, 210)') el.style.removeProperty('background-color');
+  });
+}
 // Check if current route is strictly in Tasks Management grid
 function isTasksPage() {
   return window.location.hash.includes('/tasks/manage/');
@@ -60,14 +94,19 @@ function applyRowColor(row, color) {
 // Listen for live toggle updates from the popup menu instantly
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'SETTINGS_UPDATED') {
-    if (!message.settings.masterEnable || !message.settings.featureHover) {
+    danmedSettings = { ...DANMED_DEFAULT_SETTINGS, ...(message.settings || {}) };
+    if (!DanMedFeatureEnabled('featureHover')) removeTaskTooltip();
+    if (!DanMedFeatureEnabled('featureTaskTools')) {
       removeTaskTooltip();
+      document.querySelectorAll('.modmed-custom-th, .modmed-custom-cell, .modmed-snooze-wrapper-original, #snoozed-tab-btn').forEach(el => el.remove());
     }
+    cleanupDanMedFeatureDom();
   }
 });
 
 // --- PRECISE DOM SCRAPER FOR MODMED TASK DETAILS ---
 function captureTaskNotesFromDetails() {
+  if (!DanMedFeatureEnabled('featureTaskTools')) return;
   const hash = window.location.hash || '';
   const urlMatch = hash.match(/(?:task-details\/|communication\/|task\/)(\d+|[A-Z]{2,6}-\d+)/i);
   let taskId = urlMatch ? urlMatch[1] : sessionStorage.getItem('modmed_last_clicked_task');
@@ -221,7 +260,7 @@ document.addEventListener('click', (e) => {
 
 // Inject Snooze button and Color picker
 function injectTaskCustomColumns() {
-  if (!isTasksPage()) return;
+  if (!DanMedFeatureEnabled('featureTaskTools') || !isTasksPage()) return;
   if (document.getElementById('active-snooze-popover') || document.querySelector('.modmed-color-palette-popup')) return;
 
   injectCustomColumnHeader();
@@ -625,7 +664,7 @@ function removeSnoozeTask(taskId) {
 
 // Inject Custom "Snoozed" Tab right after "All Tasks"
 function injectSnoozedTab() {
-  if (!isTasksPage() || document.getElementById('snoozed-tab-btn')) return;
+  if (!DanMedFeatureEnabled('featureTaskTools') || !isTasksPage() || document.getElementById('snoozed-tab-btn')) return;
 
   const allTasksEl = Array.from(document.querySelectorAll('a, button, div, span')).find(el => {
     return el.innerText && el.innerText.trim() === 'All Tasks' && el.children.length === 0;
@@ -682,7 +721,7 @@ function injectSnoozedTab() {
 
 // Filter "Received" Tab
 function filterReceivedTasks() {
-  if (!isTasksPage()) return;
+  if (!DanMedFeatureEnabled('featureTaskTools') || !isTasksPage()) return;
   const isSnoozedActive = document.getElementById('snoozed-tab-btn')?.classList.contains('active');
   if (isSnoozedActive) return;
 
@@ -711,7 +750,7 @@ function filterReceivedTasks() {
 
 // Render "Snoozed" Tab
 function renderSnoozedView() {
-  if (!isTasksPage()) return;
+  if (!DanMedFeatureEnabled('featureTaskTools') || !isTasksPage()) return;
   chrome.storage.local.get(['snoozedTasks'], (result) => {
     const snoozedTasks = result.snoozedTasks || {};
     const now = new Date().getTime();
@@ -736,7 +775,7 @@ function renderSnoozedView() {
 }
 
 function applyTaskFiltering() {
-  if (!isTasksPage()) return;
+  if (!DanMedFeatureEnabled('featureTaskTools') || !isTasksPage()) return;
   const isSnoozedActive = document.getElementById('snoozed-tab-btn')?.classList.contains('active');
   if (isSnoozedActive) {
     renderSnoozedView();
@@ -748,6 +787,7 @@ function applyTaskFiltering() {
 // Watch for SPA DOM Updates & Continually Scrape Notes
 let observerTimeout = null;
 const observer = new MutationObserver(() => {
+  if (!DanMedFeatureEnabled('featureTaskTools')) return;
   captureTaskNotesFromDetails();
 
   if (!isTasksPage()) {
