@@ -16,6 +16,7 @@ The extension is intended for the ModMed staff application at `https://*.modmeda
 - Add a Snoozed task tab.
 - Show note previews when hovering over task rows.
 - Automatically set **View Records By** to **100** on task-management pages.
+- Automatically delete stored task metadata when a task is completed or reassigned.
 
 ### ModMed shortcuts
 

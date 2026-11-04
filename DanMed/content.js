@@ -233,7 +233,47 @@ function getTaskIdFromRow(row) {
   const result = getTaskCellAndId(row);
   return result.taskId;
 }
-
+const danmedTaskSnapshots = new Map();
+const danmedTaskCleanupInFlight = new Set();
+function getTaskColumnIndex(labels) {
+  const header = document.querySelector('table thead tr');
+  if (!header) return -1;
+  return Array.from(header.querySelectorAll('th')).findIndex(th => labels.some(label => th.innerText.trim().toLowerCase().includes(label)));
+}
+function getTaskColumnText(row, labels) {
+  const index = getTaskColumnIndex(labels);
+  const cells = Array.from(row.querySelectorAll(':scope > td'));
+  return index >= 0 && cells[index] ? cells[index].innerText.replace(/\s+/g, ' ').trim() : '';
+}
+function getTaskLifecycleSnapshot(row) {
+  const statusSelect = row.querySelector('select[ng-model*="status"], select[name*="status" i]');
+  const assigneeSelect = row.querySelector('select[ng-model*="assign" i], select[name*="assign" i]');
+  const status = (statusSelect?.selectedOptions?.[0]?.textContent || statusSelect?.value || getTaskColumnText(row, ['status'])).replace(/\s+/g, ' ').trim();
+  const assignee = (assigneeSelect?.selectedOptions?.[0]?.textContent || assigneeSelect?.value || getTaskColumnText(row, ['assigned to', 'assignee', 'staff'])).replace(/\s+/g, ' ').trim();
+  return { status, assignee };
+}
+function deleteTaskMetadata(taskId) {
+  if (!taskId || danmedTaskCleanupInFlight.has(taskId)) return;
+  danmedTaskCleanupInFlight.add(taskId);
+  chrome.storage.local.get(['snoozedTasks'], (result) => {
+    const snoozedTasks = result.snoozedTasks || {};
+    if (Object.prototype.hasOwnProperty.call(snoozedTasks, taskId)) {
+      delete snoozedTasks[taskId];
+      chrome.storage.local.set({ snoozedTasks });
+    }
+    danmedTaskCleanupInFlight.delete(taskId);
+  });
+}
+function inspectTaskLifecycle(row) {
+  const taskId = getTaskIdFromRow(row);
+  if (!taskId) return;
+  const snapshot = getTaskLifecycleSnapshot(row);
+  const previous = danmedTaskSnapshots.get(taskId);
+  const completed = /\b(completed|complete|done|closed|resolved)\b/i.test(snapshot.status);
+  const reassigned = !!(previous?.assignee && snapshot.assignee && previous.assignee !== snapshot.assignee);
+  if (completed || reassigned) deleteTaskMetadata(taskId);
+  danmedTaskSnapshots.set(taskId, snapshot);
+}
 // Position custom column header right after the "Priority" column
 function injectCustomColumnHeader() {
   const headerRow = document.querySelector('table thead tr');
@@ -438,6 +478,24 @@ document.addEventListener('click', (e) => {
     }
   }
 });
+document.addEventListener('change', (e) => {
+  const control = e.target.closest('select, input, textarea');
+  if (!control) return;
+  const binding = [control.name, control.id, control.getAttribute('ng-model'), control.getAttribute('formcontrolname')]
+    .filter(Boolean).join(' ').toLowerCase();
+  if (!/(status|assign|assignee|owner|staff)/i.test(binding)) return;
+  const row = control.closest('table tbody tr');
+  if (row) {
+    inspectTaskLifecycle(row);
+    return;
+  }
+  if (/tasks\/task-details\//i.test(window.location.hash || '') || /assign|assignee|owner|staff/i.test(binding)) {
+    const taskId = sessionStorage.getItem('modmed_last_clicked_task');
+    if (taskId && (/completed|complete|done|closed|resolved/i.test(control.value || control.innerText || '') || /assign|assignee|owner|staff/i.test(binding))) {
+      deleteTaskMetadata(taskId);
+    }
+  }
+});
 
 // Inject Snooze button and Color picker
 function injectTaskCustomColumns() {
@@ -455,6 +513,7 @@ function injectTaskCustomColumns() {
     rows.forEach((row) => {
       const { cell: taskCell, taskId } = getTaskCellAndId(row);
       if (!taskId || !taskCell) return;
+      inspectTaskLifecycle(row);
 
       const snoozeData = snoozedTasks[taskId] || {};
       const now = new Date().getTime();

@@ -11,6 +11,7 @@ The extension is intended for the ModMed staff application at `https://*.modmeda
 ### Task management
 
 - Snooze tasks and persist snooze metadata.
+- Automatically delete stored task metadata when a task is completed or reassigned.
 - Add task labels and row colors.
 - Display a dedicated label column in the task list.
 - Add a Snoozed task tab.
