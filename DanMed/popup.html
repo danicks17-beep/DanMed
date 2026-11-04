@@ -15,6 +15,8 @@
     .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background: #fff; transition: .2s; border-radius: 50%; }
     input:checked + .slider { background: #2563eb; }
     input:checked + .slider:before { transform: translateX(14px); }
+    .dashboard-link { display: block; margin-top: 12px; padding-top: 10px; border-top: 1px solid #e2e8f0; color: #2563eb; font-size: 12px; font-weight: 700; text-align: center; text-decoration: none; }
+    .dashboard-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -27,14 +29,15 @@
   <div class="switch-container"><span>OTC Charge Shortcuts</span><label class="switch"><input type="checkbox" id="otcChargeShortcuts"><span class="slider"></span></label></div>
   <div class="switch-container"><span>Insurance Payer Shortcuts</span><label class="switch"><input type="checkbox" id="payerShortcuts"><span class="slider"></span></label></div>
   <div class="switch-container"><span>Location Shortcuts</span><label class="switch"><input type="checkbox" id="locationShortcuts"><span class="slider"></span></label></div>
-  <div class="switch-container"><span>Task Staff Shortcuts</span><label class="switch"><input type="checkbox" id="taskStaffShortcuts"><span class="slider"></span></label></div>
-  <div class="switch-container"><span>Staff Shortcuts</span><label class="switch"><input type="checkbox" id="staffShortcuts"><span class="slider"></span></label></div>
+  <div class="switch-container"><span>Staff &amp; Task Staff Shortcuts</span><label class="switch"><input type="checkbox" id="staffShortcuts"><span class="slider"></span></label></div>
   <div class="switch-container"><span>Provider Shortcuts</span><label class="switch"><input type="checkbox" id="providerShortcuts"><span class="slider"></span></label></div>
   <div class="switch-container"><span>Fax Option Renaming</span><label class="switch"><input type="checkbox" id="faxOptionRenaming"><span class="slider"></span></label></div>
+  <div class="switch-container"><span>Eligibility Helper</span><label class="switch"><input type="checkbox" id="eligibilityHelper"><span class="slider"></span></label></div>
   <div class="section">Billing &amp; display automation</div>
   <div class="switch-container"><span>Attachment Document Shortcuts</span><label class="switch"><input type="checkbox" id="attachmentDocumentShortcuts"><span class="slider"></span></label></div>
   <div class="switch-container"><span>Appointment Highlighting</span><label class="switch"><input type="checkbox" id="appointmentHighlighting"><span class="slider"></span></label></div>
   <div class="switch-container"><span>Self-Pay Charge Overrides</span><label class="switch"><input type="checkbox" id="selfPayOverrides"><span class="slider"></span></label></div>
+  <a class="dashboard-link" href="#" id="openDashboard">Open full dashboard ↗</a>
   <script src="popup.js"></script>
 </body>
 </html>

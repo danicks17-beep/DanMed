@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DanMed Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="icon.png" alt="DanMed" width="40" height="40">
+      <div>
+        <p class="eyebrow">DanMed extension</p>
+        <h1>Dashboard</h1>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span class="version" id="version">Version —</span>
+      <button class="button button-secondary" id="resetSettings" type="button">Reset settings</button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">ModMed EMA staff tools</p>
+        <h2>Configure DanMed in one place.</h2>
+        <p class="hero-copy">Choose which workflow helpers are active. Changes are saved locally and applied to open ModMed tabs.</p>
+      </div>
+      <label class="master-card">
+        <span>
+          <strong>Extension enabled</strong>
+          <small>Turn all DanMed features on or off.</small>
+        </span>
+        <span class="switch"><input type="checkbox" id="masterEnable" checked><span class="slider"></span></span>
+      </label>
+    </section>
+
+    <section class="stats-grid" aria-label="DanMed status">
+      <article class="stat-card"><span class="stat-label">Active features</span><strong id="enabledCount">—</strong><span class="stat-detail" id="enabledDetail">Loading settings</span></article>
+      <article class="stat-card"><span class="stat-label">Saved snoozes</span><strong id="snoozeCount">—</strong><span class="stat-detail">Stored on this browser</span></article>
+      <article class="stat-card"><span class="stat-label">Custom colors</span><strong id="colorCount">—</strong><span class="stat-detail">Task label colors</span></article>
+    </section>
+
+    <div id="settingsContainer"></div>
+
+    <section class="shortcut-editor-section">
+      <div class="editor-heading">
+        <div>
+          <p class="eyebrow">Shortcut customization</p>
+          <h2 class="editor-title">Edit your quick selections.</h2>
+          <p class="hero-copy">Add, edit, or remove entries from each shortcut list. OTC charge shortcuts are managed by DanMed and are intentionally not editable here.</p>
+        </div>
+      </div>
+      <div id="shortcutEditors" class="shortcut-editors"></div>
+    </section>
+
+    <section class="utility-grid">
+      <article class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">Portability</p><h3>Back up your settings</h3></div></div>
+        <p class="muted">Export DanMed preferences and task data to a JSON file, or restore a previous backup.</p>
+        <div class="button-row">
+          <button class="button button-primary" id="exportSettings" type="button">Export backup</button>
+          <button class="button button-secondary" id="importSettings" type="button">Import backup</button>
+          <input id="importFile" type="file" accept="application/json,.json" hidden>
+        </div>
+      </article>
+      <article class="panel note-panel">
+        <p class="eyebrow">Safety note</p>
+        <h3>Review automated billing behavior</h3>
+        <p class="muted">DanMed interacts with the ModMed page and its selectors may change when ModMed is updated. Verify billing and insurance workflows before relying on them in production.</p>
+        <a href="https://github.com/danicks17-beep/DanMed" target="_blank" rel="noreferrer">View DanMed on GitHub <span aria-hidden="true">↗</span></a>
+      </article>
+    </section>
+
+    <p class="save-status" id="saveStatus" role="status" aria-live="polite">All changes are saved locally.</p>
+  </main>
+  <script src="shortcut-data.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

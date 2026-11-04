@@ -16,6 +16,7 @@ The extension is intended for the ModMed staff application at `https://*.modmeda
 - Add a Snoozed task tab.
 - Show note previews when hovering over task rows.
 - Automatically set **View Records By** to **100** on task-management pages.
+- **Eligibility Helper** — sets Insurance Eligibility Reports to 100 records and adds guarded multi-page Re-check All processing with timestamp-based progress.
 
 ### ModMed shortcuts
 
@@ -88,6 +89,7 @@ Click the DanMed extension icon to open the controls popup. Settings are saved w
 - **Fax Option Renaming**
 - **Attachment Document Shortcuts**
 - **Appointment Highlighting**
+- **Eligibility Helper**
 - **Self-Pay Charge Overrides**
 
 All feature switches are enabled by default. Turning off the master switch disables all feature-gated behavior without deleting saved settings.
@@ -112,6 +114,7 @@ After pulling new changes, return to the extensions page and click **Reload** fo
 DanMed/
 ├── manifest.json   # Manifest V3 metadata, permissions, and content-script registration
 ├── content.js      # Shared settings, route titles, task tools, and page automation
+├── eligibility-helper.js # Insurance Eligibility Report workflow
 ├── features.js     # Integrated shortcut, appointment, billing, and attachment features
 ├── popup.html      # Extension popup UI and feature switches
 ├── popup.js        # Popup settings persistence and live messaging

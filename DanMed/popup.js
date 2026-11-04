@@ -4,17 +4,21 @@ const DEFAULT_SETTINGS = {
   featureHover: true,
   appointmentHighlighting: true,
   locationShortcuts: true,
-  taskStaffShortcuts: true,
   staffShortcuts: true,
   providerShortcuts: true,
   payerShortcuts: true,
   faxOptionRenaming: true,
   otcChargeShortcuts: true,
+  eligibilityHelper: true,
   selfPayOverrides: true,
   attachmentDocumentShortcuts: true
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('openDashboard')?.addEventListener('click', event => {
+    event.preventDefault();
+    chrome.runtime.openOptionsPage();
+  });
   const ids = Object.keys(DEFAULT_SETTINGS);
   const controls = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
   chrome.storage.local.get(['extensionSettings'], ({ extensionSettings }) => {

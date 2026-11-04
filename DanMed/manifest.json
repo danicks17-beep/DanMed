@@ -1,13 +1,17 @@
 {
   "manifest_version": 3,
   "name": "DanMed",
-  "version": "4.5",
+  "version": "4.9",
   "permissions": [
     "storage"
   ],
   "action": {
     "default_icon": "icon.png",
     "default_popup": "popup.html"
+  },
+  "options_ui": {
+    "page": "dashboard.html",
+    "open_in_tab": true
   },
   "icons": {
     "16": "icon.png",
@@ -20,7 +24,9 @@
         "https://*.modmedapp.com/ema/web/practice/staff/*"
       ],
       "js": [
+        "shortcut-data.js",
         "content.js",
+        "eligibility-helper.js",
         "features.js"
       ],
       "css": [

@@ -11,15 +11,80 @@ const DANMED_DEFAULT_SETTINGS = {
   payerShortcuts: true,
   faxOptionRenaming: true,
   otcChargeShortcuts: true,
+  eligibilityHelper: true,
   selfPayOverrides: true,
   attachmentDocumentShortcuts: true
 };
 let danmedSettings = { ...DANMED_DEFAULT_SETTINGS };
+let danmedShortcutLists = {};
 chrome.storage.local.get(['extensionSettings'], (result) => {
   danmedSettings = { ...DANMED_DEFAULT_SETTINGS, ...(result.extensionSettings || {}) };
 });
+chrome.storage.local.get(['shortcutLists'], (result) => {
+  danmedShortcutLists = result.shortcutLists || {};
+  window.DanMedCleanShortcutLists(danmedShortcutLists);
+  window.dispatchEvent(new CustomEvent('danmed-shortcuts-updated'));
+});
+window.DanMedGetShortcutList = (key, fallback) => {
+  const canonicalKey = key === 'taskStaffShortcuts' ? 'staffShortcuts' : key;
+  const saved = danmedShortcutLists[canonicalKey] || (key === 'taskStaffShortcuts' ? danmedShortcutLists.taskStaffShortcuts : undefined);
+  return Array.isArray(saved) ? saved : fallback;
+};
+window.DanMedSortShortcuts = (items) => [...items].sort((a, b) => Number(b.pinned === true) - Number(a.pinned === true));
+window.DanMedToggleShortcutPin = (listKey, item) => {
+  const canonicalKey = listKey === 'taskStaffShortcuts' ? 'staffShortcuts' : listKey;
+  chrome.storage.local.get(['shortcutLists'], (result) => {
+    const lists = result.shortcutLists || {};
+    const defaults = window.DANMED_DEFAULT_SHORTCUT_LISTS[canonicalKey] || [];
+    const list = Array.isArray(lists[canonicalKey]) ? lists[canonicalKey] : (Array.isArray(lists.taskStaffShortcuts) && canonicalKey === 'staffShortcuts' ? lists.taskStaffShortcuts : JSON.parse(JSON.stringify(defaults)));
+    const items = canonicalKey === 'payerShortcuts' ? list.flatMap(group => group.items || []) : list;
+    const target = items.find(candidate => candidate.label === item.label && candidate.search === item.search);
+    if (!target) return;
+    target.pinned = target.pinned !== true;
+    chrome.storage.local.set({ shortcutLists: { ...lists, [canonicalKey]: list } });
+  });
+};
+window.DanMedCreatePinButton = (listKey, item) => {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'danmed-pin-shortcut';
+  button.style.cssText = 'float: right; border: 0; background: transparent; color: #673ab7; cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px;';
+  const update = () => {
+    button.textContent = item.pinned === true ? '★' : '☆';
+    button.title = item.pinned === true ? 'Unpin shortcut' : 'Pin shortcut';
+    button.setAttribute('aria-label', button.title);
+  };
+  update();
+  const stop = (event) => { event.preventDefault(); event.stopPropagation(); };
+  button.addEventListener('mousedown', stop);
+  button.addEventListener('click', (event) => {
+    stop(event);
+    item.pinned = item.pinned !== true;
+    update();
+    window.DanMedToggleShortcutPin(listKey, item);
+  });
+  return button;
+};
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== 'local') return;
+  if (changes.extensionSettings) {
+    danmedSettings = { ...DANMED_DEFAULT_SETTINGS, ...(changes.extensionSettings.newValue || {}) };
+    if (!DanMedFeatureEnabled('featureHover')) removeTaskTooltip();
+    if (!DanMedFeatureEnabled('featureTaskTools')) {
+      removeTaskTooltip();
+      document.querySelectorAll('.modmed-custom-th, .modmed-custom-cell, .modmed-snooze-wrapper-original, #snoozed-tab-btn').forEach(el => el.remove());
+    }
+    cleanupDanMedFeatureDom();
+  }
+  if (changes.shortcutLists) {
+    danmedShortcutLists = changes.shortcutLists.newValue || {};
+    window.DanMedCleanShortcutLists(danmedShortcutLists);
+    window.dispatchEvent(new CustomEvent('danmed-shortcuts-updated'));
+  }
+});
 function DanMedFeatureEnabled(feature) {
-  return danmedSettings.masterEnable !== false && danmedSettings[feature] !== false;
+  const canonicalFeature = feature === 'taskStaffShortcuts' ? 'staffShortcuts' : feature;
+  return danmedSettings.masterEnable !== false && danmedSettings[canonicalFeature] !== false;
 }
 window.DanMedFeatureEnabled = DanMedFeatureEnabled;
 
@@ -135,6 +200,9 @@ function applyDanMedRouteEnhancements() {
 
 function cleanupDanMedFeatureDom() {
   document.querySelectorAll('.custom-location-shortcuts, .custom-staff-shortcuts, #payer-shortcuts-container, .custom-shortcut-item, .custom-shortcut-option, .custom-provider-shortcuts, .danmed-attachment-shortcut, .modmed-task-tooltip').forEach(el => el.remove());
+  if (!DanMedFeatureEnabled('eligibilityHelper')) {
+    document.querySelectorAll('[data-danmed-eligibility-helper], [data-danmed-eligibility-status]').forEach(el => el.remove());
+  }
   document.querySelectorAll('ng-dropdown-panel[data-shortcuts-added]').forEach(panel => {
     panel.querySelector('.custom-shortcut-option')?.parentElement?.remove();
     delete panel.dataset.shortcutsAdded;
@@ -485,7 +553,7 @@ function injectTaskCustomColumns() {
         colorBtn.appendChild(dot);
 
         const labelSpan = document.createElement('span');
-        labelSpan.innerText = activeColor ? 'Color' : '🎨 Color';
+        labelSpan.innerText = activeColor ? '🎨 Color' : '🎨 Color';
         colorBtn.appendChild(labelSpan);
 
         colorBtn.addEventListener('click', (e) => {
