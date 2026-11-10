@@ -161,11 +161,22 @@ function setNativeSelectValue(select, value) {
   ['input', 'change'].forEach(type => select.dispatchEvent(new Event(type, { bubbles: true })));
 }
 
+const danmedRecordsPageSizePending = new WeakSet();
+
 function setRecordsPerPage100() {
   const route = getDanMedStaffRoute();
   const isTasksManagement = route.startsWith('/tasks/manage/');
   const isFaxesManagement = route.startsWith('/faxes/manage/');
   if (!isTasksManagement && !isFaxesManagement) return;
+
+  // Never steal focus while the user is interacting with a form control.
+  // This is especially important on the task filter panel, which contains
+  // several Angular/ng-select inputs that are re-rendered as they are used.
+  const activeElement = document.activeElement;
+  if (activeElement && activeElement !== document.body &&
+      (activeElement.matches('input, textarea, select, button, [contenteditable="true"]') ||
+       activeElement.closest('ng-select'))) return;
+
   const selects = Array.from(document.querySelectorAll('select')).filter(select => {
     const options = Array.from(select.options || []).map(option => option.text.trim());
     const context = (select.closest('label, .form-group, td, div')?.innerText || '').replace(/\s+/g, ' ');
@@ -181,7 +192,11 @@ function setRecordsPerPage100() {
     /View Records By/i.test((el.innerText || '').replace(/\s+/g, ' ')) && el.querySelector('ng-select')
   );
   const ngSelect = recordLabel?.querySelector('ng-select');
-  if (ngSelect && !/\b100\b/.test(ngSelect.innerText || '')) {
+  if (ngSelect && !/\b100\b/.test(ngSelect.innerText || '') &&
+      !ngSelect.classList.contains('ng-select-opened') &&
+      ngSelect.getAttribute('aria-expanded') !== 'true' &&
+      !danmedRecordsPageSizePending.has(ngSelect)) {
+    danmedRecordsPageSizePending.add(ngSelect);
     ngSelect.querySelector('.ng-select-container')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     ngSelect.querySelector('.ng-select-container')?.click();
     setTimeout(() => {
@@ -189,6 +204,11 @@ function setRecordsPerPage100() {
         .find(el => (el.innerText || '').trim() === '100');
       option?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
       option?.click();
+      // Allow a retry only if ModMed replaced the control without selecting 100.
+      setTimeout(() => {
+        if (!document.contains(ngSelect) || /\b100\b/.test(ngSelect.innerText || '')) return;
+        danmedRecordsPageSizePending.delete(ngSelect);
+      }, 500);
     }, 50);
   }
 }
@@ -1049,4 +1069,3 @@ const observer = new MutationObserver(() => {
 
 observer.observe(document.body, { childList: true, subtree: true });
 applyDanMedRouteEnhancements();
-setInterval(applyDanMedRouteEnhancements, 750);
