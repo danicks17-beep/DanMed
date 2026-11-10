@@ -161,11 +161,22 @@ function setNativeSelectValue(select, value) {
   ['input', 'change'].forEach(type => select.dispatchEvent(new Event(type, { bubbles: true })));
 }
 
+const danmedRecordsPageSizePending = new WeakSet();
+
 function setRecordsPerPage100() {
   const route = getDanMedStaffRoute();
   const isTasksManagement = route.startsWith('/tasks/manage/');
   const isFaxesManagement = route.startsWith('/faxes/manage/');
   if (!isTasksManagement && !isFaxesManagement) return;
+
+  // Never steal focus while the user is interacting with a form control.
+  // This is especially important on the task filter panel, which contains
+  // several Angular/ng-select inputs that are re-rendered as they are used.
+  const activeElement = document.activeElement;
+  if (activeElement && activeElement !== document.body &&
+      (activeElement.matches('input, textarea, select, button, [contenteditable="true"]') ||
+       activeElement.closest('ng-select'))) return;
+
   const selects = Array.from(document.querySelectorAll('select')).filter(select => {
     const options = Array.from(select.options || []).map(option => option.text.trim());
     const context = (select.closest('label, .form-group, td, div')?.innerText || '').replace(/\s+/g, ' ');
@@ -181,7 +192,11 @@ function setRecordsPerPage100() {
     /View Records By/i.test((el.innerText || '').replace(/\s+/g, ' ')) && el.querySelector('ng-select')
   );
   const ngSelect = recordLabel?.querySelector('ng-select');
-  if (ngSelect && !/\b100\b/.test(ngSelect.innerText || '')) {
+  if (ngSelect && !/\b100\b/.test(ngSelect.innerText || '') &&
+      !ngSelect.classList.contains('ng-select-opened') &&
+      ngSelect.getAttribute('aria-expanded') !== 'true' &&
+      !danmedRecordsPageSizePending.has(ngSelect)) {
+    danmedRecordsPageSizePending.add(ngSelect);
     ngSelect.querySelector('.ng-select-container')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     ngSelect.querySelector('.ng-select-container')?.click();
     setTimeout(() => {
@@ -189,6 +204,11 @@ function setRecordsPerPage100() {
         .find(el => (el.innerText || '').trim() === '100');
       option?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
       option?.click();
+      // Allow a retry only if ModMed replaced the control without selecting 100.
+      setTimeout(() => {
+        if (!document.contains(ngSelect) || /\b100\b/.test(ngSelect.innerText || '')) return;
+        danmedRecordsPageSizePending.delete(ngSelect);
+      }, 500);
     }, 50);
   }
 }
@@ -235,6 +255,22 @@ function getTaskIdFromRow(row) {
 }
 const danmedTaskSnapshots = new Map();
 const danmedTaskCleanupInFlight = new Set();
+let danmedSnoozedTasksWriteQueue = Promise.resolve();
+
+function updateSnoozedTasks(mutator, callback) {
+  danmedSnoozedTasksWriteQueue = danmedSnoozedTasksWriteQueue.then(() => new Promise((resolve) => {
+    chrome.storage.local.get(['snoozedTasks'], (result) => {
+      const snoozedTasks = result.snoozedTasks || {};
+      mutator(snoozedTasks);
+      chrome.storage.local.set({ snoozedTasks }, () => {
+        callback?.();
+        resolve();
+      });
+    });
+  }));
+  return danmedSnoozedTasksWriteQueue;
+}
+
 function getTaskColumnIndex(labels) {
   const header = document.querySelector('table thead tr');
   if (!header) return -1;
@@ -255,12 +291,9 @@ function getTaskLifecycleSnapshot(row) {
 function deleteTaskMetadata(taskId) {
   if (!taskId || danmedTaskCleanupInFlight.has(taskId)) return;
   danmedTaskCleanupInFlight.add(taskId);
-  chrome.storage.local.get(['snoozedTasks'], (result) => {
-    const snoozedTasks = result.snoozedTasks || {};
-    if (Object.prototype.hasOwnProperty.call(snoozedTasks, taskId)) {
-      delete snoozedTasks[taskId];
-      chrome.storage.local.set({ snoozedTasks });
-    }
+  updateSnoozedTasks((snoozedTasks) => {
+    if (Object.prototype.hasOwnProperty.call(snoozedTasks, taskId)) delete snoozedTasks[taskId];
+  }, () => {
     danmedTaskCleanupInFlight.delete(taskId);
   });
 }
@@ -384,12 +417,8 @@ function captureTaskNotesFromDetails() {
 }
 
 function saveCachedTaskNotes(taskId, notes) {
-  chrome.storage.local.get(['snoozedTasks'], (result) => {
-    const snoozedTasks = result.snoozedTasks || {};
-    if (!snoozedTasks[taskId]) {
-      snoozedTasks[taskId] = {};
-    }
-    
+  updateSnoozedTasks((snoozedTasks) => {
+    if (!snoozedTasks[taskId]) snoozedTasks[taskId] = {};
     const timestamp = new Date().toLocaleString([], { 
       month: '2-digit', 
       day: '2-digit', 
@@ -401,7 +430,6 @@ function saveCachedTaskNotes(taskId, notes) {
     if (snoozedTasks[taskId].cachedNotes !== notes || !snoozedTasks[taskId].lastChecked) {
       snoozedTasks[taskId].cachedNotes = notes;
       snoozedTasks[taskId].lastChecked = timestamp;
-      chrome.storage.local.set({ snoozedTasks });
     }
   });
 }
@@ -491,9 +519,18 @@ document.addEventListener('change', (e) => {
   }
   if (/tasks\/task-details\//i.test(window.location.hash || '') || /assign|assignee|owner|staff/i.test(binding)) {
     const taskId = sessionStorage.getItem('modmed_last_clicked_task');
-    if (taskId && (/completed|complete|done|closed|resolved/i.test(control.value || control.innerText || '') || /assign|assignee|owner|staff/i.test(binding))) {
-      deleteTaskMetadata(taskId);
-    }
+    if (!taskId) return;
+
+    // ModMed emits change events while initializing the detail form. Only
+    // delete metadata after an established value actually changes; otherwise
+    // opening a task erases its saved color and cached note immediately.
+    const kind = /(status|completed|complete|done|closed|resolved)/i.test(binding) ? 'status' : 'assignee';
+    const value = (control.selectedOptions?.[0]?.textContent || control.value || control.innerText || '')
+      .replace(/\s+/g, ' ').trim();
+    const snapshotKey = `detail:${taskId}:${kind}`;
+    const previousValue = danmedTaskSnapshots.get(snapshotKey);
+    if (previousValue && value && previousValue !== value) deleteTaskMetadata(taskId);
+    if (value) danmedTaskSnapshots.set(snapshotKey, value);
   }
 });
 
@@ -862,43 +899,37 @@ function showDatePickerPopover(buttonEl, row, existingData = null) {
 
 // Storage helpers
 function saveTaskSnoozeAndLabel(taskId, snoozeUntilDate, label) {
-  chrome.storage.local.get(['snoozedTasks'], (result) => {
-    const snoozedTasks = result.snoozedTasks || {};
+  updateSnoozedTasks((snoozedTasks) => {
     snoozedTasks[taskId] = {
       ...snoozedTasks[taskId],
       snoozeUntil: snoozeUntilDate.toISOString(),
       snoozedAt: new Date().toISOString(),
       label: label || ''
     };
-    chrome.storage.local.set({ snoozedTasks }, () => {
+  }, () => {
       applyTaskFiltering();
       injectTaskCustomColumns();
-    });
   });
 }
 
 function updateTaskColor(taskId, color) {
-  chrome.storage.local.get(['snoozedTasks'], (result) => {
-    const snoozedTasks = result.snoozedTasks || {};
+  updateSnoozedTasks((snoozedTasks) => {
     if (!snoozedTasks[taskId]) {
       snoozedTasks[taskId] = {};
     }
     snoozedTasks[taskId].rowColor = color;
-    chrome.storage.local.set({ snoozedTasks });
   });
 }
 
 function removeSnoozeTask(taskId) {
-  chrome.storage.local.get(['snoozedTasks'], (result) => {
-    const snoozedTasks = result.snoozedTasks || {};
+  updateSnoozedTasks((snoozedTasks) => {
     if (snoozedTasks[taskId]) {
       delete snoozedTasks[taskId].snoozeUntil;
       delete snoozedTasks[taskId].snoozedAt;
     }
-    chrome.storage.local.set({ snoozedTasks }, () => {
+  }, () => {
       applyTaskFiltering();
       injectTaskCustomColumns();
-    });
   });
 }
 
@@ -1049,4 +1080,3 @@ const observer = new MutationObserver(() => {
 
 observer.observe(document.body, { childList: true, subtree: true });
 applyDanMedRouteEnhancements();
-setInterval(applyDanMedRouteEnhancements, 750);
